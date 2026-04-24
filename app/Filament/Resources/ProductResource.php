@@ -39,8 +39,10 @@ class ProductResource extends Resource
             Forms\Components\FileUpload::make('file_url')
                 ->label('Foto Produk')
                 ->image()
+                ->disk('public')
                 ->directory('products')
-                ->maxSize(2048),
+                ->maxSize(2048)
+                ->maxFiles(1),
 
             Forms\Components\TextInput::make('purchase_price')
                 ->label('Harga Beli')

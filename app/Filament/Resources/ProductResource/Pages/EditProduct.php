@@ -8,13 +8,18 @@ use App\Models\StockLevel;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Storage;
 
 class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
 
+    protected ?string $oldFileUrl = null;
+
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $this->oldFileUrl = $this->record->file_url;
+
         // Load stok dari toko pertama yang ada
         $stockLevel = StockLevel::where('product_id', $this->record->product_id)
             ->first();
@@ -30,6 +35,16 @@ class EditProduct extends EditRecord
 
     protected function afterSave(): void
     {
+        $newFileUrl = $this->record->file_url;
+
+        if ($this->oldFileUrl && $this->oldFileUrl !== $newFileUrl) {
+            $disk = 'public';
+
+            if (Storage::disk($disk)->exists($this->oldFileUrl)) {
+                Storage::disk($disk)->delete($this->oldFileUrl);
+            }
+        }
+
         $storeId = $this->data['initial_store_id'] ?? null;
         $stock = $this->data['initial_stock'] ?? null;
         $discount = $this->data['initial_discount'] ?? 0;
