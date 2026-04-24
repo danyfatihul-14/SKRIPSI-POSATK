@@ -226,37 +226,5 @@
             </div>
         </section>
     </div>
-
-    <div class="container-fluid px-3 px-md-4">
-        <section class="section-card mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="fw-bold mb-0" style="font-size: 1.35rem; color: #212529;">Pertanyaan Umum</h2>
-            </div>
-
-            <div class="accordion accordion-flush" id="faqPublic">
-                <div class="accordion-item">
-                    <h2 class="accordion-header">
-                        <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq1" style="font-size: 0.9rem; font-weight: 500;">
-                            Apakah bisa lihat produk tanpa login?
-                        </button>
-                    </h2>
-                    <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqPublic">
-                        <div class="accordion-body py-3" style="font-size: 0.88rem; color: #6c757d;">Bisa, dashboard dan katalog publik bisa diakses sebelum login.</div>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <h2 class="accordion-header">
-                        <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq2" style="font-size: 0.9rem; font-weight: 500;">
-                            Bagaimana cara mencari produk?
-                        </button>
-                    </h2>
-                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqPublic">
-                        <div class="accordion-body py-3" style="font-size: 0.88rem; color: #6c757d;">Gunakan pencarian di hero atau buka katalog lalu filter kategori.</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
 </div>
 @endsection
