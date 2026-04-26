@@ -45,48 +45,48 @@
         if (countEl) countEl.innerText = list.length;
 
         if (!list.length) {
-            box.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px;">
-                <div style="width: 80px; height: 80px; background: #f0f0f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" style="width: 40px; height: 40px; color: #ccc;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
-                </div>
-                <div style="color: var(--dark); font-weight: 600; font-size: 16px;">Produk tidak ditemukan</div>
-                <div style="color: var(--dark-light); font-size: 13px; margin-top: 8px;">Coba kata kunci yang berbeda</div>
-            </div>`;
+            box.innerHTML = `...`;
             return;
         }
 
         box.innerHTML = list.map(prod => `
-            <div class="product-card"
-                onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'"
-                onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'"
-                onclick="addCart('${prod.product_id}','${prod.product_name.replace(/'/g,"\\'")}',${prod.selling_price})">
+        <div class="product-card"
+            onclick="addCart('${prod.product_id}','${prod.product_name.replace(/'/g,"\\'")}',${prod.selling_price})">
 
-                <div style="position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background: #f5f5f5;">
-                    ${prod.image_url
-                        ? `<img src="${prod.image_url}" style="width: 100%; height: 100%; object-fit: cover; transition: transform .3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.innerHTML=noImageHTML('${prod.product_name.charAt(0)}')">`
-                        : `<div style="width: 100%; height: 100%;">${noImageHTML(prod.product_name)}</div>`}
+            <div style="position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background: #f5f5f5;">
+                ${prod.image_url
+                    ? `<img src="${prod.image_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`
+                    : `<div style="width:100%;height:100%;">${noImageHTML(prod.product_name)}</div>`}
 
-                    ${prod.discount ? `
-                    <div style="position: absolute; top: 8px; left: 8px;">
-                        <span style="background: #ef4444; color: white; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px;">${prod.discount}%</span>
-                    </div>` : ''}
+                <div style="position:absolute; top:8px; right:8px; background:#111827; color:white; font-size:11px; padding:4px 8px; border-radius:6px;">
+                    Stok: ${prod.stock ?? 0}
                 </div>
 
-                <div class="product-info">
-                    <div style="font-size:13px; font-weight:600; color:var(--dark); margin-bottom:6px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                        ${prod.product_name}
-                    </div>
-                    <div style="color:var(--accent); font-weight:700; font-size:14px; margin-bottom:10px;">
-                        Rp${parseInt(prod.selling_price).toLocaleString('id-ID')}
-                    </div>
-                    <div style="font-size:13px; color:var(--accent); margin-bottom:8px; font-weight:600;">
-                        Satuan: ${prod.unit}
-                    </div>
+                ${prod.discount ? `
+                <div style="position:absolute; top:8px; left:8px;">
+                    <span style="background:#ef4444; color:white; font-size:11px; font-weight:700; padding:4px 8px; border-radius:6px;">${prod.discount}%</span>
+                </div>` : ''}
+            </div>
+
+            <div class="product-info">
+                <div style="font-size:13px; font-weight:600; margin-bottom:4px;">
+                    ${prod.product_name}
+                </div>
+
+                <div style="font-size:12px; color:#2563eb; font-weight:600; margin-bottom:4px;">
+                    Varian: ${prod.variant ?? '-'}
+                </div>
+
+                <div style="font-size:12px; color:var(--accent); margin-bottom:6px;">
+                    Satuan: ${prod.unit}
+                </div>
+
+                <div style="font-size:14px; font-weight:700; color:var(--accent);">
+                    Rp${parseInt(prod.selling_price).toLocaleString('id-ID')}
                 </div>
             </div>
-        `).join('');
+        </div>
+    `).join('');
     }
 
     function addCart(id, name, price, btn = null) {
@@ -332,15 +332,26 @@
         cancel.textContent = config.cancelText;
         cancel.style.display = config.showCancel ? 'inline-block' : 'none';
 
-        ok.onclick = () => { closeAppModal(); if (typeof config.onOk === 'function') config.onOk(); };
-        cancel.onclick = () => { closeAppModal(); if (typeof config.onCancel === 'function') config.onCancel(); };
+        ok.onclick = () => {
+            closeAppModal();
+            if (typeof config.onOk === 'function') config.onOk();
+        };
+        cancel.onclick = () => {
+            closeAppModal();
+            if (typeof config.onCancel === 'function') config.onCancel();
+        };
 
         modal.classList.remove('is-hidden');
         modal.setAttribute('aria-hidden', 'false');
     }
 
     window.showAlert = function(message, type = 'info') {
-        const titleMap = { success:'Berhasil', error:'Error', warning:'Peringatan', info:'Informasi' };
+        const titleMap = {
+            success: 'Berhasil',
+            error: 'Error',
+            warning: 'Peringatan',
+            info: 'Informasi'
+        };
         openAppModal({
             size: 'modal-sm',
             title: titleMap[type] || 'Informasi',

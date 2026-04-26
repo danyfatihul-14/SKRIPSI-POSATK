@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('purchase_price', 12, 2);
             $table->decimal('selling_price', 12, 2);
             $table->enum('unit', ['biji', 'lusin', 'pack', 'dus', 'rim', 'pak', 'box', 'rol', 'set'])->default('biji');
+            $table->string('variants')->nullable();
 
             $table->timestamps();
         });

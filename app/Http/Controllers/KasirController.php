@@ -32,25 +32,30 @@ class KasirController extends Controller
     public function search(Request $request)
     {
         $q = $request->get('q', '');
+        $storeId = $request->user()?->store_id;
 
-        $query = Product::query();
+        $query = Product::query()->with([
+            'stockLevels' => fn($subQuery) => $subQuery->where('store_id', $storeId),
+        ]);
 
         if (! empty($q)) {
-            $query->where('product_name', 'like', "%$q%");
+            $query->where(function ($subQuery) use ($q) {
+                $subQuery->where('product_name', 'like', "%$q%")
+                    ->orWhere('variant', 'like', "%$q%");
+            });
         }
 
         $products = $query->get()->map(function ($product) {
+            $stockLevel = $product->stockLevels->first();
+
             return [
-                'product_id'     => $product->product_id,
-                'product_name'   => $product->product_name,
-                'selling_price'  => $product->selling_price,
-                'unit'           => $product->unit,
-                'original_price' => $product->original_price ?? null,
-                'discount'       => $product->discount ?? null,
-                'rating'         => $product->rating ?? 0,
-                'image_url'      => $product->file_url
-                    ? asset('storage/' . $product->file_url)
-                    : null,
+                'product_id'    => $product->product_id,
+                'product_name'  => $product->product_name,
+                'variant'       => $product->variant ?? '-',
+                'unit'          => $product->unit ?? '-',
+                'selling_price' => $product->selling_price ?? 0,
+                'stock'         => (int) ($stockLevel?->quantity ?? 0),
+                'image_url'     => $product->file_url ? asset('storage/' . $product->file_url) : null,
             ];
         });
 
@@ -323,11 +328,14 @@ class KasirController extends Controller
                 $subtotal = $quantity * $unitPrice;
 
                 return [
-                    'product_id' => $product->product_id,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'discount' => 0,
-                    'subtotal' => $subtotal,
+                    'product_id'   => $product->product_id,
+                    'product_name' => $product->product_name,
+                    'variant'      => $product->variant ?? '-',
+                    'unit'         => $product->unit ?? '-',
+                    'selling_price' => $product->selling_price,
+                    'stock'        => $stockLevel?->quantity ?? 0,
+                    'discount'     => $stockLevel?->discount ?? 0,
+                    'image_url'    => $product->file_url ? asset('storage/' . $product->file_url) : null,
                 ];
             })
             ->filter()

@@ -211,6 +211,13 @@
 
                 {{-- Info --}}
                 <h3 class="product-title">{{ $product['product_name'] }}</h3>
+
+                @if(!empty($product['variant']) && $product['variant'] !== '-')
+                <p class="product-category" style="font-weight:600; color:#2563eb;">
+                    Varian: {{ $product['variant'] }}
+                </p>
+                @endif
+
                 <p class="product-category">{{ $product['category_name'] }}</p>
 
                 <div class="product-info">
@@ -225,13 +232,6 @@
                             {{ $product['stock'] }}
                         </span>
                     </div>
-
-                    @if($product['discount'] > 0)
-                    <div class="product-info-row">
-                        <span class="product-label">Diskon:</span>
-                        <span class="product-value" style="color: #f97316;">Rp {{ number_format($product['discount'], 0, ',', '.') }}</span>
-                    </div>
-                    @endif
                 </div>
 
                 {{-- Actions --}}

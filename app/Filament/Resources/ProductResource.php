@@ -1,25 +1,21 @@
 <?php
+// filepath: e:\Polinema\Semester8\Skripsi\pos\app\Filament\Resources\ProductResource.php
 
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
 use App\Models\Store;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Forms\Components\FileUpload;
 
 class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-
     protected static ?string $navigationLabel = 'Product';
-
     protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
@@ -39,22 +35,99 @@ class ProductResource extends Resource
             Forms\Components\FileUpload::make('file_url')
                 ->label('Foto Produk')
                 ->image()
+                ->acceptedFileTypes(['image/*'])
                 ->disk('public')
                 ->directory('products')
                 ->maxSize(2048)
-                ->maxFiles(1),
+                ->maxFiles(1)
+                ->extraInputAttributes([
+                    'accept' => 'image/*',
+                    'capture' => 'environment',
+                ]),
+
+            Forms\Components\Select::make('initial_store_id')
+                ->label('Toko')
+                ->options(fn() => Store::query()->pluck('name_store', 'store_id'))
+                ->searchable()
+                ->required(fn(string $operation) => $operation === 'create')
+                ->visible(fn(string $operation) => $operation === 'create')
+                ->dehydrated(true),
+
+            // Dipakai saat CREATE (multi baris)
+            Forms\Components\Repeater::make('variants')
+                ->label('Detail Variasi')
+                ->visible(fn(string $operation) => $operation === 'create')
+                ->required(fn(string $operation) => $operation === 'create')
+                ->minItems(1)
+                ->defaultItems(1)
+                ->addActionLabel('Tambah Variasi')
+                ->columnSpanFull()
+                ->grid([
+                    'default' => 1,
+                    'xl' => 2,
+                ])
+                ->schema([
+                    Forms\Components\TextInput::make('purchase_price')
+                        ->label('Harga Beli')
+                        ->numeric()
+                        ->prefix('Rp')
+                        ->required(),
+
+                    Forms\Components\TextInput::make('selling_price')
+                        ->label('Harga Jual')
+                        ->numeric()
+                        ->prefix('Rp')
+                        ->required(),
+
+                    Forms\Components\Select::make('unit')
+                        ->label('Satuan')
+                        ->options([
+                            'biji' => 'Biji',
+                            'lusin' => 'Lusin',
+                            'pack' => 'Pack',
+                            'dus' => 'Dus',
+                            'rim' => 'Rim',
+                            'pak' => 'Pak',
+                            'box' => 'Box',
+                            'rol' => 'Rol',
+                            'set' => 'Set',
+                        ])
+                        ->required()
+                        ->default('biji'),
+
+                    Forms\Components\TextInput::make('variant')
+                        ->label('Varian Isi')
+                        ->placeholder('contoh: 50 Lembar')
+                        ->maxLength(100),
+
+                    Forms\Components\TextInput::make('initial_stock')
+                        ->label('Stok Awal')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0)
+                        ->required(),
+
+                    Forms\Components\TextInput::make('initial_discount')
+                        ->label('Diskon Awal')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0),
+                ])
+                ->columns(2),
 
             Forms\Components\TextInput::make('purchase_price')
                 ->label('Harga Beli')
                 ->numeric()
                 ->prefix('Rp')
-                ->required(),
+                ->required(fn(string $operation) => $operation === 'edit')
+                ->visible(fn(string $operation) => $operation === 'edit'),
 
             Forms\Components\TextInput::make('selling_price')
                 ->label('Harga Jual')
                 ->numeric()
                 ->prefix('Rp')
-                ->required(),
+                ->required(fn(string $operation) => $operation === 'edit')
+                ->visible(fn(string $operation) => $operation === 'edit'),
 
             Forms\Components\Select::make('unit')
                 ->label('Satuan')
@@ -69,31 +142,14 @@ class ProductResource extends Resource
                     'rol' => 'Rol',
                     'set' => 'Set',
                 ])
-                ->required()
-                ->default('biji'),
+                ->required(fn(string $operation) => $operation === 'edit')
+                ->visible(fn(string $operation) => $operation === 'edit'),
 
-            // Field stok awal (untuk create/edit)
-            Forms\Components\Select::make('initial_store_id')
-                ->label('Toko (Stok Awal)')
-                ->options(fn() => Store::query()->pluck('name_store', 'store_id'))
-                ->searchable()
-                ->required()
-                ->dehydrated(false), // jangan masuk ke table products
-
-            Forms\Components\TextInput::make('initial_stock')
-                ->label('Stok Awal')
-                ->numeric()
-                ->minValue(0)
-                ->default(0)
-                ->required()
-                ->dehydrated(false),
-
-            Forms\Components\TextInput::make('initial_discount')
-                ->label('Diskon Awal')
-                ->numeric()
-                ->minValue(0)
-                ->default(0)
-                ->dehydrated(false),
+            Forms\Components\TextInput::make('variant')
+                ->label('Varian Isi')
+                ->placeholder('contoh: 50 lembar')
+                ->maxLength(100)
+                ->visible(fn(string $operation) => $operation === 'edit'),
         ]);
     }
 

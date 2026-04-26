@@ -22,6 +22,7 @@ class Product extends Model
         'purchase_price',
         'selling_price',
         'unit',
+        'variant',
     ];
 
     protected $casts = [
@@ -56,17 +57,36 @@ class Product extends Model
     protected static function booted(): void
     {
         static::updating(function (Product $product): void {
-            if ($product->isDirty('file_url')) {
-                $oldPath = $product->getOriginal('file_url');
+            if (! $product->isDirty('file_url')) {
+                return;
+            }
 
-                if (!empty($oldPath)) {
-                    Storage::disk('public')->delete($oldPath);
-                }
+            $oldPath = $product->getOriginal('file_url');
+            if (empty($oldPath)) {
+                return;
+            }
+
+            $isUsedByOther = static::query()
+                ->where('file_url', $oldPath)
+                ->where('product_id', '!=', $product->product_id)
+                ->exists();
+
+            if (! $isUsedByOther) {
+                Storage::disk('public')->delete($oldPath);
             }
         });
 
         static::deleted(function (Product $product): void {
-            if (!empty($product->file_url)) {
+            if (empty($product->file_url)) {
+                return;
+            }
+
+            $isUsedByOther = static::query()
+                ->where('file_url', $product->file_url)
+                ->where('product_id', '!=', $product->product_id)
+                ->exists();
+
+            if (! $isUsedByOther) {
                 Storage::disk('public')->delete($product->file_url);
             }
         });
