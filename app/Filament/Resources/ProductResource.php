@@ -9,6 +9,9 @@ use App\Models\Store;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ProductResource extends Resource
 {
@@ -38,8 +41,50 @@ class ProductResource extends Resource
                 ->acceptedFileTypes(['image/*'])
                 ->disk('public')
                 ->directory('products')
-                ->maxSize(2048)
+                ->maxSize(10240)
                 ->maxFiles(1)
+                ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
+                    $extension = 'jpg';
+                    $path = 'products/' . Str::ulid() . '.' . $extension;
+                
+                    $contents = file_get_contents($file->getRealPath());
+                
+                    $image = @imagecreatefromstring($contents);
+                
+                    if ($image === false) {
+                        Storage::disk('public')->put($path, $contents);
+                        return $path;
+                    }
+                
+                    $width = imagesx($image);
+                    $height = imagesy($image);
+                
+                    $maxWidth = 800;
+                    $maxHeight = 800;
+                
+                    $ratio = min($maxWidth / $width, $maxHeight / $height, 1);
+                    $newWidth = (int) ($width * $ratio);
+                    $newHeight = (int) ($height * $ratio);
+                
+                    $resized = imagescale($image, $newWidth, $newHeight);
+                    imagedestroy($image);
+                
+                    if ($resized === false) {
+                        Storage::disk('public')->put($path, $contents);
+                        return $path;
+                    }
+                
+                    ob_start();
+                    imagejpeg($resized, null, 40);
+                    $final = ob_get_clean();
+                
+                    imagedestroy($resized);
+                
+                    Storage::disk('public')->put($path, $final);
+                
+                    return $path;
+                })
+                ->helperText('Foto otomatis dikompres (low quality, max 2MB)')
                 ->extraInputAttributes([
                     'accept' => 'image/*',
                     'capture' => 'environment',

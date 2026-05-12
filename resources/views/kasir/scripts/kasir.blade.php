@@ -230,34 +230,38 @@
         }
 
         const redirectPage = options.redirectPage || 'kasir';
-        const successMessage = options.successMessage || 'Pesanan berhasil dikirim ke kasir.';
-
-        // Buat form element
         const form = new FormData();
-        form.append('cart', JSON.stringify(cart)); // ← Stringify!
-        form.append('payment', 0); // ← Numeric
-        form.append('payment_method', 'cash'); // ← String
+        form.append('cart', JSON.stringify(cart));
+        form.append('payment', 0);
+        form.append('payment_method', 'cash');
 
         fetch('{{ route("kasir.order.store") }}', {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
                 },
                 body: form,
             })
-            .then(r => r.json())
-            .then(data => {
-                if (data.message) {
-                    cart = [];
-                    updateCartBadge();
-                    showPage(redirectPage);
-                    if (redirectPage === 'pending' && typeof renderPendingList === 'function') {
-                        setTimeout(() => renderPendingList(), 300);
-                    }
-                    window.showAlert(data.message);
+            .then(async (r) => {
+                const text = await r.text();
+                let data = {};
+                try {
+                    data = JSON.parse(text);
+                } catch (_) {}
+
+                if (!r.ok) {
+                    throw new Error(data.message || `HTTP ${r.status} - ${text.slice(0, 180)}`);
                 }
+                return data;
             })
-            .catch(e => window.showAlert('Error: ' + e.message, 'error'));
+            .then((data) => {
+                cart = [];
+                updateCartBadge();
+                showPage(redirectPage);
+                window.showAlert(data.message || 'Order berhasil dikirim.');
+            })
+            .catch((e) => window.showAlert('Error: ' + e.message, 'error'));
     }
 
     function showCenterMessage(message, title = 'Informasi') {

@@ -109,8 +109,8 @@
 
 @if($products->hasPages())
 <section class="section-card">
-    <div class="d-flex justify-content-center">
-        {{ $products->withQueryString()->links() }}
+    <div class="d-flex justify-content-center mt-4">
+        {{ $products->withQueryString()->links('pagination::bootstrap-5') }}
     </div>
 </section>
 @endif

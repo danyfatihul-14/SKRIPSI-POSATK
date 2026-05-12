@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Midtrans\Config;
 use Midtrans\Snap;
-use Midtrans\Transaction as MidtransTransaction;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class KasirController extends Controller
 {
@@ -64,57 +65,58 @@ class KasirController extends Controller
 
     public function storeOrder(Request $request)
     {
-        abort_unless(in_array($request->user()?->role, ['pelayan', 'cashier'], true), 403);
+        try {
+            $rawCart = $request->input('cart', []);
+            $cart = is_string($rawCart) ? json_decode($rawCart, true) : $rawCart;
 
-        $payload = $request->validate([
-            'cart' => ['required', 'string'],
-            'payment' => ['required', 'numeric', 'min:0'],
-            'payment_method' => ['required', 'in:cash,qris'],
-        ]);
-
-        $cart = json_decode($payload['cart'], true);
-        if (!is_array($cart) || empty($cart)) {
-            return response()->json([
-                'message' => 'Keranjang kosong atau tidak valid.'
-            ], 422);
-        }
-
-        $items = $this->buildCartItems($cart);
-        $subtotal = collect($items)->sum('subtotal');
-
-        $transaction = DB::transaction(function () use ($request, $items, $subtotal) {
-            $transaction = Transaction::create([
-                'store_id' => $request->user()->store_id,
-                'user_id' => $request->user()->user_id,
-                'subtotal' => $subtotal,
-                'tax' => 0,
-                'discount' => 0,
-                'total_amount' => $subtotal,
-                'status' => 'pending_payment',
-                'payment_method' => null,
-                'customer_type' => 'walkin',
-                'notes' => 'Order dibuat oleh pelayan',
-            ]);
-
-            foreach ($items as $item) {
-                TransactionItem::create([
-                    'transaction_id' => $transaction->transaction_id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'discount' => $item['discount'],
-                    'subtotal' => $item['subtotal'],
-                ]);
+            if (! is_array($cart) || empty($cart)) {
+                return response()->json(['message' => 'Keranjang tidak valid / kosong.'], 422);
             }
 
-            return $transaction;
-        });
+            $storeId = (int) ($request->user()?->store_id ?? 0);
+            $items = $this->buildCartItems($cart, $storeId);
+            $subtotal = (float) collect($items)->sum('subtotal');
 
-        return response()->json([
-            'message' => 'Pesanan berhasil dikirim ke kasir.',
-            'transaction_id' => $transaction->transaction_id,
-            'transaction_code' => $transaction->transaction_code,
-        ]);
+            DB::transaction(function () use ($request, $items, $subtotal) {
+                $transaction = Transaction::create([
+                    'store_id'       => $request->user()->store_id,
+                    'user_id'        => $request->user()->user_id,
+                    'subtotal'       => $subtotal,
+                    'tax'            => 0,
+                    'discount'       => 0,
+                    'total_amount'   => $subtotal,
+                    'status'         => 'pending_payment',
+                    'payment_method' => null,
+                    'customer_type'  => 'walkin',
+                    'notes'          => 'Order dibuat oleh pelayan',
+                ]);
+
+                foreach ($items as $item) {
+                    TransactionItem::create([
+                        'transaction_id' => $transaction->transaction_id,
+                        'product_id'     => $item['product_id'],
+                        'quantity'       => $item['quantity'],
+                        'unit_price'     => $item['unit_price'],
+                        'discount'       => $item['discount'],
+                        'subtotal'       => $item['subtotal'],
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'message' => 'Order berhasil dikirim ke waiting payment.',
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Kasir order gagal', [
+                'error' => $e->getMessage(),
+                'line'  => $e->getLine(),
+                'file'  => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'message' => app()->isLocal() ? $e->getMessage() : 'Terjadi kesalahan saat menyimpan order.',
+            ], 500);
+        }
     }
 
     public function generateQris(Request $request)
@@ -217,15 +219,15 @@ class KasirController extends Controller
             ]);
         }
 
-        $items = $this->buildCartItems($cart);
-        $subtotal = collect($items)->sum('subtotal');
+        $storeId = (int) ($request->user()?->store_id ?? 0);
+        $items = $this->buildCartItems($cart, $storeId);
+
+        $subtotal = (float) collect($items)->sum('subtotal');
         $payment = (float) $payload['payment'];
 
-        // QRIS: Payment otomatis sesuai total (tidak perlu harus sama persis)
         if ($payload['payment_method'] === 'qris') {
-            $payment = $subtotal; // Override ke total untuk QRIS
+            $payment = $subtotal;
         } else {
-            // Cash/Transfer: harus lebih dari atau sama dengan total
             if ($payment < $subtotal) {
                 throw ValidationException::withMessages([
                     'payment' => 'Nominal pembayaran kurang dari total belanja.',
@@ -235,26 +237,26 @@ class KasirController extends Controller
 
         $transaction = DB::transaction(function () use ($request, $items, $subtotal, $payload) {
             $transaction = Transaction::create([
-                'store_id' => $request->user()->store_id,
-                'user_id' => $request->user()->user_id,
-                'subtotal' => $subtotal,
-                'tax' => 0,
-                'discount' => 0,
-                'total_amount' => $subtotal,
-                'status' => 'completed',
+                'store_id'       => $request->user()->store_id,
+                'user_id'        => $request->user()->user_id,
+                'subtotal'       => $subtotal,
+                'tax'            => 0,
+                'discount'       => 0,
+                'total_amount'   => $subtotal,
+                'status'         => 'completed',
                 'payment_method' => $payload['payment_method'],
-                'customer_type' => 'walkin',
-                'notes' => 'Transaksi dibayar oleh kasir',
+                'customer_type'  => 'walkin',
+                'notes'          => 'Transaksi dibayar oleh kasir',
             ]);
 
             foreach ($items as $item) {
                 TransactionItem::create([
                     'transaction_id' => $transaction->transaction_id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'discount' => $item['discount'],
-                    'subtotal' => $item['subtotal'],
+                    'product_id'     => $item['product_id'],
+                    'quantity'       => $item['quantity'],
+                    'unit_price'     => $item['unit_price'],
+                    'discount'       => $item['discount'],
+                    'subtotal'       => $item['subtotal'],
                 ]);
             }
 
@@ -298,49 +300,67 @@ class KasirController extends Controller
         return response()->json(['status' => 'success']);
     }
 
-    private function buildCartItems(array $rawCart): array
+    private function buildCartItems(array $rawCart, ?int $storeId = null): array
     {
-        $productIds = collect($rawCart)
-            ->pluck('id')
-            ->filter()
-            ->unique()
+        $normalized = collect($rawCart)
+            ->map(function ($row) {
+                return [
+                    'product_id' => (int) ($row['product_id'] ?? $row['id'] ?? 0),
+                    'qty'        => (int) ($row['qty'] ?? 0),
+                ];
+            })
+            ->filter(fn($row) => $row['product_id'] > 0 && $row['qty'] > 0)
             ->values();
 
-        $products = Product::whereIn('product_id', $productIds)
+        $productIds = $normalized->pluck('product_id')->unique()->values();
+
+        $products = Product::query()
+            ->with([
+                'stockLevels' => fn($q) => $storeId
+                    ? $q->where('store_id', $storeId)
+                    : $q,
+            ])
+            ->whereIn('product_id', $productIds)
             ->get()
             ->keyBy('product_id');
 
-        $items = collect($rawCart)
-            ->map(function ($row) use ($products) {
-                $product = $products->get($row['id'] ?? null);
+        $items = $normalized->map(function ($row) use ($products) {
+            $product = $products->get($row['product_id']);
+            if (! $product) {
+                return null;
+            }
 
-                if (! $product) {
-                    return null;
-                }
+            $stockLevel = $product->stockLevels->first();
+            $stock = (int) ($stockLevel?->quantity ?? 0);
+            $qty = (int) $row['qty'];
 
-                $quantity = (int) ($row['qty'] ?? 0);
+            if ($qty < 1) {
+                return null;
+            }
 
-                if ($quantity < 1) {
-                    return null;
-                }
+            if ($qty > $stock) {
+                throw ValidationException::withMessages([
+                    'cart' => "Stok {$product->product_name} tidak cukup. Sisa stok: {$stock}.",
+                ]);
+            }
 
-                $unitPrice = (float) $product->selling_price;
-                $subtotal = $quantity * $unitPrice;
+            $unitPrice = (float) ($product->selling_price ?? 0);
+            $discount = (float) ($stockLevel?->discount ?? 0);
+            $subtotal = ($qty * $unitPrice) - $discount;
 
-                return [
-                    'product_id'   => $product->product_id,
-                    'product_name' => $product->product_name,
-                    'variant'      => $product->variant ?? '-',
-                    'unit'         => $product->unit ?? '-',
-                    'selling_price' => $product->selling_price,
-                    'stock'        => $stockLevel?->quantity ?? 0,
-                    'discount'     => $stockLevel?->discount ?? 0,
-                    'image_url'    => $product->file_url ? asset('storage/' . $product->file_url) : null,
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
+            return [
+                'product_id'   => (int) $product->product_id,
+                'product_name' => (string) $product->product_name,
+                'variant'      => (string) ($product->variant ?? '-'),
+                'unit'         => (string) ($product->unit ?? '-'),
+                'quantity'     => $qty,
+                'unit_price'   => $unitPrice,
+                'discount'     => $discount,
+                'subtotal'     => max(0, $subtotal),
+                'stock'        => $stock,
+                'image_url'    => $product->file_url ? asset('storage/' . $product->file_url) : null,
+            ];
+        })->filter()->values()->all();
 
         if (count($items) === 0) {
             throw ValidationException::withMessages([

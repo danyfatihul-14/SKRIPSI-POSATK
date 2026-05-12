@@ -212,13 +212,11 @@
                 {{-- Info --}}
                 <h3 class="product-title">{{ $product['product_name'] }}</h3>
 
-                @if(!empty($product['variant']) && $product['variant'] !== '-')
-                <p class="product-category" style="font-weight:600; color:#2563eb;">
-                    Varian: {{ $product['variant'] }}
+                <p class="product-category" style="color:#2563eb; font-weight:600; margin-bottom:2px;">
+                    Varian: {{ $product['variant'] ?? '-' }}
                 </p>
-                @endif
 
-                <p class="product-category">{{ $product['category_name'] }}</p>
+                <p class="product-category">{{ $product['category_name'] ?? '-' }}</p>
 
                 <div class="product-info">
                     <div class="product-info-row">

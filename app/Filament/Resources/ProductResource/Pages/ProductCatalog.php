@@ -42,10 +42,15 @@ class ProductCatalog extends Page
 
     public function loadProducts(): void
     {
-        $query = Product::query()->with('category', 'stockLevels');
+        $query = \App\Models\Product::query()
+            ->with(['category', 'stockLevels']);
 
-        if ($this->search) {
-            $query->where('product_name', 'like', '%' . $this->search . '%');
+        if (!empty($this->search)) {
+            $q = $this->search;
+            $query->where(function ($sub) use ($q) {
+                $sub->where('product_name', 'like', "%{$q}%")
+                    ->orWhere('variant', 'like', "%{$q}%");
+            });
         }
 
         $this->products = $query->get()->map(function ($product) {
@@ -54,12 +59,11 @@ class ProductCatalog extends Page
             return [
                 'product_id'     => $product->product_id,
                 'product_name'   => $product->product_name,
+                'variant'        => $product->variant ?: '-',
                 'category_name'  => $product->category?->category_name ?? '-',
-                'file_url'       => $product->file_url ?? null,
+                'file_url'       => $product->file_url,
                 'selling_price'  => (float) ($product->selling_price ?? 0),
-                'purchase_price' => (float) ($product->purchase_price ?? 0),
                 'stock'          => (int) ($stockLevel?->quantity ?? 0),
-                'unit_price'     => (float) ($stockLevel?->unit_price ?? $product->selling_price ?? 0),
                 'discount'       => (float) ($stockLevel?->discount ?? 0),
             ];
         })->toArray();
