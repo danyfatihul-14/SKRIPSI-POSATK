@@ -2,66 +2,39 @@
     <style>
         .product-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-        }
-
-        @media (min-width: 640px) {
-            .product-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
-
-        @media (min-width: 768px) {
-            .product-grid {
-                grid-template-columns: repeat(5, 1fr);
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .product-grid {
-                grid-template-columns: repeat(6, 1fr);
-            }
-        }
-
-        @media (min-width: 1280px) {
-            .product-grid {
-                grid-template-columns: repeat(7, 1fr);
-            }
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
         }
 
         .product-card {
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+            padding: 12px;
             position: relative;
-            transition: box-shadow 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border: 1px solid #f1f5f9;
         }
 
         .product-card:hover {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .product-image {
-            width: 100%;
-            aspect-ratio: 1;
-            object-fit: cover;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            background: #f3f4f6;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
 
         .edit-icon {
             position: absolute;
-            top: 4px;
-            right: 4px;
-            background: #3b82f6;
+            top: 6px;
+            right: 6px;
+            background: rgba(59, 130, 246, 0.9);
             border-radius: 50%;
-            padding: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            padding: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
             z-index: 10;
             line-height: 0;
+            transition: background 0.2s;
         }
 
         .edit-icon:hover {
@@ -76,76 +49,94 @@
         }
 
         .product-title {
-            font-size: 11px;
-            font-weight: 600;
-            line-height: 1.3;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+            margin-top: 4px;
             margin-bottom: 4px;
+            color: #1e293b;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
-            min-height: 28px;
+            min-height: 34px;
         }
 
         .product-category {
-            font-size: 9px;
-            color: #6b7280;
-            margin-bottom: 6px;
+            font-size: 10px;
+            color: #64748b;
+            margin-bottom: 4px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
         .product-info {
-            font-size: 9px;
-            margin-bottom: 6px;
+            font-size: 10px;
+            margin-bottom: 8px;
+            border-top: 1px dashed #f1f5f9;
+            padding-top: 6px;
         }
 
         .product-info-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2px;
+            margin-bottom: 3px;
         }
 
         .product-label {
-            color: #6b7280;
+            color: #64748b;
         }
 
         .product-value {
-            font-weight: 600;
-            font-size: 10px;
+            font-weight: 700;
+            font-size: 11px;
+            color: #0f172a;
         }
 
         .product-stock-ok {
-            color: #059669;
+            color: #10b981;
             font-weight: 700;
         }
 
         .product-stock-out {
-            color: #dc2626;
+            color: #ef4444;
             font-weight: 700;
         }
 
         .product-actions {
-            display: flex;
-            gap: 4px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: auto;
+            padding-top: 8px;
+            border-top: 1px solid #f1f5f9;
         }
 
         .btn-edit,
-        .btn-delete {
-            flex: 1;
-            padding: 6px 0;
+        .btn-delete,
+        .btn-predict {
+            padding: 7px 0;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             color: white;
-            font-size: 9px;
-            font-weight: 500;
+            font-size: 10px;
+            font-weight: 700;
             cursor: pointer;
             transition: background 0.2s;
             text-align: center;
             text-decoration: none;
             display: block;
+        }
+
+        .btn-predict {
+            grid-column: span 2;
+            background: #10b981;
+        }
+
+        .btn-predict:hover {
+            background: #059669;
         }
 
         .btn-edit {
@@ -166,9 +157,17 @@
     </style>
 
     <div class="space-y-2">
-        {{-- Search --}}
-        <div class="flex gap-2 items-center">
-            <x-filament::input.wrapper class="flex-1">
+        {{-- Filters & Search --}}
+        <div class="flex gap-2 items-center flex-wrap">
+            <x-filament::input.wrapper class="w-48">
+                <x-filament::input.select wire:model.live="storeId" class="text-xs">
+                    @foreach($stores as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
+                    @endforeach
+                </x-filament::input.select>
+            </x-filament::input.wrapper>
+
+            <x-filament::input.wrapper class="flex-1 min-w-[200px]">
                 <x-filament::input
                     type="text"
                     wire:model.live="search"
@@ -196,27 +195,29 @@
                     </svg>
                 </a>
 
-                {{-- Image --}}
-                @if($product['file_url'])
-                <img
-                    src="{{ asset('storage/' . $product['file_url']) }}"
-                    alt="{{ $product['product_name'] }}"
-                    class="product-image"
-                    onerror="this.src='https://via.placeholder.com/200x200?text=No+Image'">
-                @else
-                <div class="product-image" style="display: flex; align-items: center; justify-content: center;">
-                    <span style="color: #9ca3af; font-size: 9px;">No Image</span>
+                {{-- Image Container (Golden Aspect Ratio Hack) --}}
+                <div style="position: relative; width: 100%; padding-top: 100%; background: #f1f5f9; border-radius: 8px; overflow: hidden; margin-bottom: 8px; border: 1px solid #f1f5f9;">
+                    @if($product['file_url'])
+                    <img
+                        src="{{ asset('storage/' . $product['file_url']) }}"
+                        alt="{{ $product['product_name'] }}"
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"
+                        onerror="this.src='https://placehold.co/200x200?text=No+Image'">
+                    @else
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                        <span style="color: #94a3b8; font-size: 10px; font-weight: 600;">No Image</span>
+                    </div>
+                    @endif
                 </div>
-                @endif
 
                 {{-- Info --}}
                 <h3 class="product-title">{{ $product['product_name'] }}</h3>
 
-                <p class="product-category" style="color:#2563eb; font-weight:600; margin-bottom:2px;">
+                <p class="product-category" style="color:#2563eb; font-weight:700; margin-bottom:2px; font-size:10px;">
                     Varian: {{ $product['variant'] ?? '-' }}
                 </p>
 
-                <p class="product-category">{{ $product['category_name'] ?? '-' }}</p>
+                <p class="product-category" style="font-size:10px;">{{ $product['category_name'] ?? '-' }}</p>
 
                 <div class="product-info">
                     <div class="product-info-row">
@@ -234,6 +235,11 @@
 
                 {{-- Actions --}}
                 <div class="product-actions">
+                    <button
+                        wire:click="predictProduct({{ $product['product_id'] }})"
+                        class="btn-predict">
+                        Prediksi
+                    </button>
                     <a href="{{ route('filament.admin.resources.products.edit', $product['product_id']) }}" class="btn-edit">
                         Edit
                     </a>

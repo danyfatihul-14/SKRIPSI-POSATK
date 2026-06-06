@@ -80,6 +80,13 @@
         }
 
         window.selectedPendingTransaction = trx;
+        
+        // Populate customer name dari pending transaction
+        const customerNameInput = document.getElementById('customerName');
+        if (customerNameInput) {
+            customerNameInput.value = trx.customer_name || 'Pelanggan Umum';
+        }
+        
         showPage('transaksi');
     }
 

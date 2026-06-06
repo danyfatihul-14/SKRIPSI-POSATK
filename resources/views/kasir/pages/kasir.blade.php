@@ -237,19 +237,6 @@
 
 <div id="page-kasir" class="page h-full flex flex-col active" style="background: var(--light);">
     <div style="flex: 1; overflow: hidden; padding: 16px 24px;">
-        <div id="receiptModal" class="receipt-modal hidden">
-            <div class="receipt-modal__backdrop"></div>
-
-            <div class="receipt-modal__dialog">
-                <h3 class="receipt-modal__title" id="receiptModalTitle">Pembayaran Berhasil</h3>
-                <p class="receipt-modal__message" id="receiptModalMessage">Struk siap dicetak.</p>
-
-                <div class="receipt-modal__actions">
-                    <button type="button" class="btn-secondary" id="receiptModalCloseBtn" onclick="closeReceiptModal()">Tutup</button>
-                    <button type="button" class="btn-primary" id="receiptModalPrintBtn">Cetak Struk</button>
-                </div>
-            </div>
-        </div>
         <div class="kasir-split">
             <div class="kasir-left">
                 <div style="padding: 12px 14px; border-bottom: 1px solid var(--accent); display:flex; align-items:center; justify-content:space-between; gap:10px;">
@@ -288,6 +275,16 @@
                     <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                         <span style="font-size:13px; color:var(--dark-light);">Total</span>
                         <strong id="quickCartTotal" style="color:var(--accent);">Rp0</strong>
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block; font-size:12px; font-weight:700; color:var(--dark); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Nama Pembeli</label>
+                        <input 
+                            type="text" 
+                            id="quickCustomerName" 
+                            placeholder="Masukkan nama pembeli..." 
+                            value="Pelanggan Umum"
+                            style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:10px; font-size:14px; font-weight:600; outline:none;" />
                     </div>
 
                     <div class="cart-actions">

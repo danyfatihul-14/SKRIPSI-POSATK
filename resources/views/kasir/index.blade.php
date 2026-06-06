@@ -158,6 +158,21 @@
                     <div class="nav-sub text-xs text-white/40">Proses transaksi</div>
                 </div>
             </button>
+
+            {{-- History Transaksi --}}
+            <button onclick="showPage('history')" id="nav-history"
+                class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/10 hover:text-white transition-all duration-200 group">
+                <div class="nav-icon w-9 h-9 rounded-lg bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-all duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <div class="text-sm font-semibold text-white">History</div>
+                    <div class="nav-sub text-xs text-white/40">Riwayat transaksi</div>
+                </div>
+            </button>
             @endif
 
         </nav>
@@ -185,12 +200,84 @@
         @unless ($isWaiter)
         @include('kasir.scripts.pending')
         @include('kasir.pages.transaksi')
+        @include('kasir.pages.history')
+        @include('kasir.scripts.history')
         @endunless
 
     </div>
 
     <div id="cashierSidebarOverlay" class="cashier-overlay" onclick="closeCashierSidebar()"></div>
 </div>
+
+{{-- Global Receipt Modal --}}
+<div id="receiptModal" class="receipt-modal hidden">
+    <div class="receipt-modal__backdrop"></div>
+
+    <div class="receipt-modal__dialog" style="padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:90vh;">
+        <div style="padding:20px 20px 10px; z-index:2; text-align:center;">
+            <h3 class="receipt-modal__title" id="receiptModalTitle" style="margin:0;">Pembayaran Berhasil</h3>
+            <p class="receipt-modal__message" id="receiptModalMessage" style="margin:8px 0 0; font-size:14px;">Struk siap dicetak.</p>
+        </div>
+        
+        <div id="receiptIframeContainer" style="flex:1; background:#e2e8f0; position:relative; display:none; min-height:450px;">
+            <iframe id="receiptIframe" style="width:100%; height:100%; border:none; background:#fff; display:block;"></iframe>
+        </div>
+
+        <div class="receipt-modal__actions" style="padding:15px 20px 20px; text-align:center; display:flex; gap:10px; justify-content:center;">
+            <button type="button" class="btn-secondary" id="receiptModalCloseBtn" onclick="closeReceiptModal()" style="flex:1;">Kembali ke Kasir</button>
+            <button type="button" class="btn-primary" id="receiptModalPrintBtn" style="flex:1; display:none;">Cetak Struk</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.askPrintReceipt = function(receiptUrl) {
+        if (!receiptUrl) return;
+        
+        const modal = document.getElementById('receiptModal');
+        if (!modal) {
+            window.open(receiptUrl, "_blank", "width=420,height=760");
+            return;
+        }
+        
+        const titleEl = document.getElementById('receiptModalTitle');
+        const msgEl = document.getElementById('receiptModalMessage');
+        const iframeContainer = document.getElementById('receiptIframeContainer');
+        const iframe = document.getElementById('receiptIframe');
+        const printBtn = document.getElementById('receiptModalPrintBtn');
+        
+        if (titleEl) titleEl.textContent = 'Pratinjau Struk';
+        if (msgEl) msgEl.textContent = 'Pratinjau struk Anda di bawah ini.';
+        
+        if (iframeContainer) iframeContainer.style.display = 'block';
+        if (iframe) iframe.src = receiptUrl;
+        
+        if (printBtn) {
+            printBtn.style.display = 'block';
+            printBtn.onclick = function() {
+                if (iframe.contentWindow) {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                }
+            };
+        }
+        
+        modal.classList.remove('hidden');
+    };
+
+    window.closeReceiptModal = function() {
+        const modal = document.getElementById('receiptModal');
+        if (modal) modal.classList.add('hidden');
+    };
+
+    // Close modal when backdrop is clicked
+    document.addEventListener('click', function(e) {
+        const modal = document.getElementById('receiptModal');
+        if (!modal) return;
+        const backdrop = modal.querySelector('.receipt-modal__backdrop');
+        if (e.target === backdrop) window.closeReceiptModal();
+    });
+</script>
 
 @push('scripts')
 <script>
@@ -236,6 +323,9 @@
             }
             if (page === 'transaksi' && typeof renderOrderSummary === 'function') {
                 renderOrderSummary();
+            }
+            if (page === 'history' && typeof loadTransactionHistory === 'function') {
+                loadTransactionHistory();
             }
         }
 

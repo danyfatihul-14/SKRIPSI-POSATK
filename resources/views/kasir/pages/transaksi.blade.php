@@ -259,6 +259,12 @@
                     <input type="hidden" id="pendingTransactionId" value="">
 
                     <div>
+                        <label class="trx-label">Nama Pembeli</label>
+                        <input type="text" name="customer_name" id="customerName" class="trx-input" placeholder="Masukkan nama pembeli..." value="Pelanggan Umum">
+                        <div class="trx-help">Nama pembeli untuk struk dan riwayat transaksi.</div>
+                    </div>
+
+                    <div>
                         <label class="trx-label">Metode Pembayaran</label>
                         <select id="paymentMethod" name="payment_method" class="trx-select">
                             <option value="cash">Cash</option>
@@ -295,18 +301,5 @@
                 </form>
             </div>
         </div>
-    </div>
-    <div id="qrisSection" style="display: none; margin-top: 16px; padding: 16px; background: #f0f9ff; border: 2px solid #0284c7; border-radius: 12px;">
-        <div style="text-align: center; margin-bottom: 12px;">
-            <h3 style="color: #0284c7; font-weight: 700; margin: 0 0 8px;">📱 Scan QRIS Pembayaran</h3>
-            <p style="color: #475569; font-size: 13px; margin: 0;">Arahkan aplikasi E-Wallet ke QR Code berikut</p>
-        </div>
-        <div id="qrisContainer" style="display: flex; justify-content: center; align-items: center; flex-direction: column; gap: 12px;">
-            <div id="qrisLoading" style="text-align: center;">
-                <div style="border: 3px solid #e5e7eb; border-top: 3px solid #0284c7; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
-                <p style="color: #475569; font-size: 12px; margin-top: 8px;">Sedang membuat QR Code...</p>
-            </div>
-        </div>
-        <p style="text-align: center; color: #64748b; font-size: 11px; margin-top: 12px;">Nominal: <strong id="qrisAmount">Rp0</strong></p>
     </div>
 </div>

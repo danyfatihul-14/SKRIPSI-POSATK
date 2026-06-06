@@ -41,4 +41,13 @@ return [
         'is_production' => env('MIDTRANS_PRODUCTION', false),
     ],
 
+    // =============================================
+    // ML SERVICE CONFIGURATION
+    // =============================================
+    'ml' => [
+        'api_url' => env('ML_API_URL', 'http://127.0.0.1:8000'),
+        'timeout' => env('ML_API_TIMEOUT', 30),
+        'enabled' => env('ML_ENABLED', true),
+    ],
+
 ];

@@ -234,6 +234,8 @@
     function finalizePendingPayment(paymentMethod, payment) {
         if (!window.selectedPendingTransaction) return Promise.resolve();
 
+        const customerName = document.getElementById('customerName')?.value || 'Pelanggan Umum';
+
         return fetch("/kasir/pending/" + window.selectedPendingTransaction.transaction_id + "/pay", {
             method: "POST",
             headers: {
@@ -243,7 +245,8 @@
             },
             body: JSON.stringify({
                 payment_method: paymentMethod,
-                payment: Number(payment || 0)
+                payment: Number(payment || 0),
+                customer_name: customerName
             })
         }).then(async function(r) {
             const raw = await r.text();
@@ -296,6 +299,159 @@
         });
     }
 
+    let snapResizeObserver = null;
+
+    function removeSnapEmbedOverlay() {
+        const overlay = document.getElementById('snap-embed-overlay');
+        if (overlay) overlay.remove();
+    }
+
+    function injectSnapOverlayStyles() {
+        let style = document.getElementById('snap-embed-custom-style');
+        if (style) return;
+
+        style = document.createElement('style');
+        style.id = 'snap-embed-custom-style';
+
+        style.innerHTML = `
+        /* Overlay */
+        #snap-embed-overlay{
+            position:fixed;
+            inset:0;
+            z-index:999999;
+            background:rgba(0,0,0,.75);
+
+            display:flex;
+            justify-content:center;
+            align-items:center;
+
+            padding:20px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Panel utama */
+        #snap-embed-panel{
+            position:relative;
+
+            width:min(860px, 94vw);
+            height:min(900px, 92vh);
+
+            background:#fff;
+            border-radius:24px;
+
+            overflow:hidden;
+            box-shadow:0 25px 80px rgba(0,0,0,.35);
+        }
+
+        /* Container Snap */
+        #snap-container{
+            width:100%;
+            height:100%;
+
+            overflow:auto;
+            overflow-x:hidden;
+
+            background:#fff;
+            padding:0;
+        }
+
+        /* iframe Midtrans */
+        #snap-container iframe{
+            width:100% !important;
+            height:920px !important;
+            border:none !important;
+            display:block;
+        }
+
+        /* Tombol close */
+        #snap-close-btn{
+            position:absolute;
+            top:14px;
+            right:14px;
+
+            width:42px;
+            height:42px;
+
+            border:none;
+            border-radius:50%;
+
+            background:#111827;
+            color:white;
+
+            font-size:22px;
+            cursor:pointer;
+
+            z-index:20;
+        }
+
+        /* Desktop besar */
+        @media (min-width: 1400px){
+            #snap-embed-panel{
+                width:min(960px, 92vw);
+            }
+        }
+
+        /* Mobile */
+        @media(max-width:768px){
+            #snap-embed-panel{
+                width:100vw;
+                height:100vh;
+                border-radius:0;
+            }
+
+            #snap-container iframe{
+                height:100vh !important;
+            }
+        }
+
+        /* Animasi */
+        @keyframes snapFade{
+            from{
+                opacity:0;
+                transform:scale(.96);
+            }
+            to{
+                opacity:1;
+                transform:scale(1);
+            }
+        }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function openSnapEmbed(token) {
+        // Using snap.pay() instead of embed() for native Midtrans modal
+        window.snap.pay(token, {
+            onSuccess: function(result) {
+                qrisPaid = true;
+                handleQrisSuccess(currentQrisTransactionId);
+            },
+
+            onPending: function(result) {
+                setSubmitLoading(false);
+                window.showAlert(
+                    'Menunggu pembayaran QRIS.',
+                    'info'
+                );
+            },
+
+            onError: function(result) {
+                setSubmitLoading(false);
+                qrisPaid = false;
+
+                window.showAlert(
+                    'Pembayaran QRIS gagal.',
+                    'error'
+                );
+            },
+
+            onClose: function() {
+                setSubmitLoading(false);
+                qrisPaid = false;
+            }
+        });
+    }
+
     async function finalizeDirectPayment(paymentMethod, payment) {
         const form = document.getElementById("paymentForm");
         if (!form) throw new Error("Form pembayaran tidak ditemukan.");
@@ -305,6 +461,7 @@
         payload.append("cart", document.getElementById("cartInput")?.value || "[]");
         payload.append("payment_method", paymentMethod);
         payload.append("payment", String(Number(payment || 0)));
+        payload.append("customer_name", document.getElementById("customerName")?.value || "Pelanggan Umum");
 
         const res = await fetch(form.action, {
             method: "POST",
@@ -433,7 +590,18 @@
                     qrisPaid = false;
                 });
         } else {
+            // Cash direct payment via AJAX to keep UX fluid & show the global print modal
+            e.preventDefault();
             setSubmitLoading(true);
+            const paymentVal = Number((document.getElementById("payment") || {}).value || 0);
+            finalizeDirectPayment("cash", paymentVal)
+                .catch(function(err) {
+                    window.showAlert(err.message || "Gagal menyimpan transaksi.", "error");
+                })
+                .finally(function() {
+                    setSubmitLoading(false);
+                    qrisPaid = false;
+                });
         }
     });
 
@@ -488,27 +656,12 @@
             if (!response.ok) throw new Error(data.message || "Gagal generate QRIS.");
             if (data.status !== "success" || !data.snap_token) throw new Error(data.message || "Gagal membuat token QRIS.");
 
-            window.snap.pay(data.snap_token, {
-                onSuccess: function() {
-                    qrisPaid = true;
-                    handleQrisSuccess(currentQrisTransactionId);
-                },
-                onPending: function() {
-                    setSubmitLoading(false);
-                    window.showAlert("Menunggu konfirmasi pembayaran QRIS.", "info");
-                },
-                onError: function(result) {
-                    qrisPaid = false;
-                    setSubmitLoading(false);
-                    window.showAlert("Pembayaran QRIS gagal.", "error");
-                    console.error(result);
-                },
-                onClose: function() {
-                    qrisPaid = false;
-                    setSubmitLoading(false);
-                    window.showAlert("Popup pembayaran ditutup.", "warning");
-                }
-            });
+            // gunakan embedded mode agar QRIS tampil dalam panel besar
+            try {
+                openSnapEmbed(data.snap_token);
+            } catch (e) {
+                throw e;
+            }
         } catch (error) {
             qrisPaid = false;
             setSubmitLoading(false);
@@ -553,17 +706,7 @@
         return subtotal;
     }
 
-    function askPrintReceipt(receiptUrl) {
-        if (!receiptUrl) return;
-        if (window.showConfirm) {
-            return window.showConfirm(
-                "Transaksi selesai. Cetak struk sekarang?",
-                function() {
-                    window.open(receiptUrl, "_blank", "width=420,height=760");
-                }
-            );
-        }
-    }
+
 
     // optional, buat animasi spinner jika belum ada di css global
     if (!document.getElementById("qris-spin-style")) {
@@ -649,12 +792,7 @@
         // simpan dulu ke server seperti cash/pending
         finalizePendingPayment('qris', total)
             .then(() => {
-                window.showConfirm(
-                    'Pembayaran QRIS berhasil. Cetak struk sekarang?',
-                    () => {
-                        window.location.href = `/kasir/receipt/${transactionId}`;
-                    }
-                );
+                askPrintReceipt(`/kasir/receipt/${transactionId}`);
             })
             .catch((err) => {
                 window.showAlert(err.message || 'Gagal memperbarui pending payment.', 'error');

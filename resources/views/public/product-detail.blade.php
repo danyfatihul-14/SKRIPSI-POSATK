@@ -7,7 +7,7 @@
     <div class="col-lg-6">
         <div class="soft-card overflow-hidden">
             <img
-                src="{{ $product->file_url ? asset('storage/' . $product->file_url) : 'https://via.placeholder.com/1000x700?text=Produk' }}"
+                src="{{ $product->file_url ? asset('storage/' . $product->file_url) : 'https://placehold.co/1000x700?text=Produk' }}"
                 alt="{{ $product->product_name }}"
                 class="w-100"
                 style="aspect-ratio: 4/3; object-fit: cover;">

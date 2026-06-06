@@ -17,8 +17,11 @@ class MlPrediction extends Model
         'store_id',
         'product_id',
         'prediction_date',
+        'start_date',
+        'end_date',
         'selling_price',
         'predicted_revenue',
+        'predicted_quantity',
         'confidence_level',
         'featured_used',
         'model_version',
@@ -26,8 +29,11 @@ class MlPrediction extends Model
 
     protected $casts = [
         'prediction_date' => 'date',
+        'start_date' => 'date',
+        'end_date' => 'date',
         'selling_price' => 'integer',
         'predicted_revenue' => 'decimal:2',
+        'predicted_quantity' => 'integer',
         'confidence_level' => 'decimal:4',
         'featured_used' => 'array',
         'created_at' => 'datetime',

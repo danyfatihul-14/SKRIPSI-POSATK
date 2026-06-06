@@ -501,6 +501,10 @@
 
 <body>
 
+    @php
+    $isWaiter = auth()->user()?->role === 'pelayan';
+    @endphp
+
     {{-- ===== NAVBAR ===== --}}
     <nav class="navbar">
         <div class="navbar-left">
@@ -530,7 +534,7 @@
                 <div class="profile-avatar">{{ strtoupper(substr(auth()->user()->name ?? 'K', 0, 1)) }}</div>
                 <div class="profile-info">
                     <div class="profile-name">{{ auth()->user()->name ?? 'Kasir' }}</div>
-                    <div class="profile-role">Kasir</div>
+                    <div class="profile-role">{{ $isWaiter ? 'Pelayan' : 'Kasir' }}</div>
                 </div>
                 <svg style="width:16px; height:16px; color:#FFFFFF; flex-shrink:0; margin-left:4px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -548,10 +552,7 @@
     </nav>
 
     {{-- ===== MAIN AREA ===== --}}
-    <div class="main-container">
-        @php
-        $isWaiter = auth()->user()?->role === 'pelayan';
-        @endphp
+    <div class="main-container" data-is-waiter="{{ $isWaiter ? '1' : '0' }}">
 
         {{-- ===== SIDEBAR ===== --}}
         <aside class="sidebar">
@@ -562,6 +563,41 @@
             {{-- Navigation --}}
             <nav class="sidebar-nav">
 
+                @if ($isWaiter)
+                <button onclick="showPage('kasir')" id="nav-kasir" class="nav-link active">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 6h13M10 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
+                    </svg>
+                    <div>
+                        <span style="display:block; font-size:14px;">Kasir</span>
+                        <span class="nav-desc">Daftar produk</span>
+                    </div>
+                </button>
+
+                <button onclick="showPage('keranjang')" id="nav-keranjang" class="nav-link">
+                    <div style="position:relative; width:18px; height:18px; flex-shrink:0;">
+                        <svg fill="none" viewBox="0 0 24 24" stroke-width="2" style="width:18px;height:18px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                        <span id="holdBadge" style="display:none; position:absolute; top:-6px; right:-6px; background:#ef4444; color:white; font-size:10px; font-weight:700; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center;">0</span>
+                    </div>
+                    <div style="flex:1;">
+                        <span style="display:block; font-size:14px;">Hold Order</span>
+                        <span class="nav-desc">Pesanan tertahan</span>
+                    </div>
+                    <span id="holdBadgeSidebar" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px;">0</span>
+                </button>
+
+                <button onclick="showPage('history')" id="nav-history" class="nav-link">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                        <span style="display:block; font-size:14px;">History</span>
+                        <span class="nav-desc">Riwayat transaksi</span>
+                    </div>
+                </button>
+                @else
                 {{-- Kasir --}}
                 <button onclick="showPage('kasir')" id="nav-kasir" class="nav-link active">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
@@ -588,7 +624,6 @@
                     <span id="holdBadgeSidebar" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px;">0</span>
                 </button>
 
-                @if (! $isWaiter)
                 <button onclick="showPage('pending')" id="nav-pending" class="nav-link">
                     <div style="position:relative; width:18px; height:18px; flex-shrink:0;">
                         <svg fill="none" viewBox="0 0 24 24" stroke-width="2" style="width:18px;height:18px;">
@@ -615,6 +650,16 @@
                         <span class="nav-desc">Proses transaksi</span>
                     </div>
                 </button>
+
+                <button onclick="showPage('history')" id="nav-history" class="nav-link">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                        <span style="display:block; font-size:14px;">History</span>
+                        <span class="nav-desc">Riwayat transaksi</span>
+                    </div>
+                </button>
                 @endif
 
             </nav>
@@ -634,12 +679,17 @@
 
         {{-- ===== CONTENT AREA ===== --}}
         <div class="content-area">
+            @if ($isWaiter)
             @include('kasir.pages.kasir')
             @include('kasir.pages.keranjang')
-            @unless ($isWaiter)
+            @include('kasir.pages.history')
+            @else
+            @include('kasir.pages.kasir')
+            @include('kasir.pages.keranjang')
             @include('kasir.pages.pending')
             @include('kasir.pages.transaksi')
-            @endunless
+            @include('kasir.pages.history')
+            @endif
         </div>
 
         <div id="sidebarOverlay" class="sidebar-overlay" onclick="closeMobileSidebar()"></div>
@@ -663,10 +713,11 @@
 
     @include('kasir.scripts.kasir')
     @include('kasir.scripts.keranjang')
-    @unless ($isWaiter)
+    @if (! $isWaiter)
     @include('kasir.scripts.pending')
     @include('kasir.scripts.transaksi')
-    @endunless
+    @endif
+    @include('kasir.scripts.history')
 
     <script>
         function toggleDropdown(e) {
@@ -700,6 +751,9 @@
                 if (typeof renderOrderSummary === 'function') {
                     renderOrderSummary();
                 }
+            }
+            if (page === 'history' && typeof loadTransactionHistory === 'function') {
+                loadTransactionHistory();
             }
             if (window.matchMedia('(max-width: 900px)').matches) {
                 closeMobileSidebar();
@@ -831,7 +885,8 @@
 
         updateClock();
         setInterval(updateClock, 1000);
-        showPage('kasir');
+        const isWaiterUser = document.querySelector('.main-container')?.dataset.isWaiter === '1';
+        showPage(isWaiterUser ? 'history' : 'kasir');
         if (typeof renderPendingList === 'function') {
             renderPendingList();
         }

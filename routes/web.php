@@ -27,6 +27,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/kasir/generate-qris', [KasirController::class, 'generateQris'])->name('kasir.generate-qris');
     Route::post('/kasir/midtrans-notification', [KasirController::class, 'midtransNotification'])->name('kasir.midtrans-notification')->withoutMiddleware(['auth:sanctum']);
     Route::get('/kasir/receipt/{transaction}', [KasirController::class, 'receipt'])->name('kasir.receipt');
+    Route::get('/kasir/transaction-history', [KasirController::class, 'transactionHistory'])->name('kasir.transaction-history');
     Route::get('/cashier', function () {
         return view('kasir.dashboard');})->name('cashier');
 });
+
+require __DIR__ . '/predictions.php';

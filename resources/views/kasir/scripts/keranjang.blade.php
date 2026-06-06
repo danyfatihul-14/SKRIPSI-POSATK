@@ -93,12 +93,22 @@
 
         const redirectPage = options.redirectPage || 'kasir';
         const successMessage = options.successMessage || 'Pesanan berhasil dikirim ke kasir.';
+        const customerNameInput = document.getElementById('quickCustomerName');
+        const customerName = customerNameInput?.value?.trim() || 'Pelanggan Umum';
+
+        console.log('📝 Customer Name from input:', customerName);
 
         // Encode as URL params explicit
         const params = new URLSearchParams();
         params.append('cart', JSON.stringify(cart));
         params.append('payment', 0);
         params.append('payment_method', 'cash');
+        params.append('customer_name', customerName);
+
+        console.log('📤 Sending to backend:', {
+            customer_name: customerName,
+            cart_items: cart.length
+        });
 
         fetch('{{ route("kasir.order.store") }}', {
                 method: 'POST',

@@ -18,8 +18,11 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products', 'product_id')->onDelete('cascade');
             
             $table->date('prediction_date');
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
             $table->integer('selling_price');
             $table->decimal('predicted_revenue', 12, 2);
+            $table->integer('predicted_quantity')->nullable();
             $table->decimal('confidence_level', 5, 4);
             $table->json('featured_used')->nullable();
             $table->string('model_version', 50);

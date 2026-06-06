@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\StockLevel;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use Illuminate\Http\Request;
@@ -17,7 +18,6 @@ class KasirController extends Controller
 {
     public function __construct()
     {
-        // Setup Midtrans config
         Config::$serverKey = config('services.midtrans.server_key');
         Config::$clientKey = config('services.midtrans.client_key');
         Config::$isProduction = config('services.midtrans.is_production');
@@ -38,6 +38,12 @@ class KasirController extends Controller
         $query = Product::query()->with([
             'stockLevels' => fn($subQuery) => $subQuery->where('store_id', $storeId),
         ]);
+
+        if ($storeId) {
+            $query->whereHas('stockLevels', function ($subQuery) use ($storeId) {
+                $subQuery->where('store_id', $storeId);
+            });
+        }
 
         if (! empty($q)) {
             $query->where(function ($subQuery) use ($q) {
@@ -88,7 +94,8 @@ class KasirController extends Controller
                     'status'         => 'pending_payment',
                     'payment_method' => null,
                     'customer_type'  => 'walkin',
-                    'notes'          => 'Order dibuat oleh pelayan',
+                    'customer_name'  => $request->input('customer_name') ?? 'Pelanggan Umum',
+                    'notes'          => 'Order dibuat oleh [' . $request->user()->name . ']',
                 ]);
 
                 foreach ($items as $item) {
@@ -246,7 +253,8 @@ class KasirController extends Controller
                 'status'         => 'completed',
                 'payment_method' => $payload['payment_method'],
                 'customer_type'  => 'walkin',
-                'notes'          => 'Transaksi dibayar oleh kasir',
+                'customer_name'  => $request->input('customer_name') ?? 'Pelanggan Umum',
+                'notes'          => 'Transaksi dibayar oleh [' . $request->user()->name . ']',
             ]);
 
             foreach ($items as $item) {
@@ -259,6 +267,8 @@ class KasirController extends Controller
                     'subtotal'       => $item['subtotal'],
                 ]);
             }
+
+            $this->decrementStockLevels((int) $request->user()->store_id, $items);
 
             return $transaction;
         });
@@ -277,7 +287,6 @@ class KasirController extends Controller
             ->with('success', 'Transaksi berhasil disimpan.');
     }
 
-    // ✨ NEW METHOD: Webhook dari Midtrans untuk verifikasi payment
     public function midtransNotification(Request $request)
     {
         $serverKey = config('services.midtrans.server_key');
@@ -371,12 +380,51 @@ class KasirController extends Controller
         return $items;
     }
 
+    /**
+     * Kurangi stok produk sesuai item transaksi.
+     */
+    private function decrementStockLevels(int $storeId, array $items): void
+    {
+        foreach ($items as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            $quantity = (int) ($item['quantity'] ?? 0);
+
+            if ($productId <= 0 || $quantity <= 0) {
+                continue;
+            }
+
+            $stockLevel = StockLevel::query()
+                ->where('store_id', $storeId)
+                ->where('product_id', $productId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $stockLevel) {
+                throw ValidationException::withMessages([
+                    'cart' => 'Stok produk tidak ditemukan untuk salah satu item transaksi.',
+                ]);
+            }
+
+            if ((int) $stockLevel->quantity < $quantity) {
+                throw ValidationException::withMessages([
+                    'cart' => 'Stok ' . ($stockLevel->product?->product_name ?? 'produk') . ' tidak cukup. Sisa stok: ' . $stockLevel->quantity . '.',
+                ]);
+            }
+
+            $stockLevel->quantity = (int) $stockLevel->quantity - $quantity;
+            $stockLevel->save();
+        }
+    }
+
     // Existing methods (pendingList, payPending, dll) tetap sama...
     public function pendingList(Request $request)
     {
         abort_unless($request->user()?->role === 'cashier', 403);
 
+        $storeId = $request->user()?->store_id;
+
         $rows = Transaction::query()
+            ->where('store_id', $storeId)
             ->where('status', 'pending_payment')
             ->with([
                 'user:user_id,name',
@@ -389,6 +437,7 @@ class KasirController extends Controller
                     'transaction_id' => $trx->transaction_id,
                     'transaction_code' => $trx->transaction_code,
                     'served_by' => $trx->user?->name ?? '-',
+                    'customer_name' => $trx->customer_name ?? 'Pelanggan Umum',
                     'total_amount' => (float) $trx->total_amount,
                     'created_at' => optional($trx->created_at)->format('d/m/Y H:i'),
                     'items' => $trx->items->map(function ($item) {
@@ -418,6 +467,7 @@ class KasirController extends Controller
         $payload = $request->validate([
             'payment_method' => ['required', 'in:cash,qris'],
             'payment' => ['required', 'numeric', 'min:0'],
+            'customer_name' => ['nullable', 'string', 'max:100'],
         ]);
 
         $total = (float) $transaction->total_amount;
@@ -427,11 +477,24 @@ class KasirController extends Controller
             return response()->json(['message' => 'Nominal pembayaran kurang dari total belanja.'], 422);
         }
 
-        $transaction->update([
-            'status' => 'completed',
-            'payment_method' => $payload['payment_method'],
-            'notes' => trim(($transaction->notes ?? '') . ' | Dibayar kasir: ' . now()->format('Y-m-d H:i:s')),
-        ]);
+        DB::transaction(function () use ($transaction, $payload, $request): void {
+            $transaction->update([
+                'status' => 'completed',
+                'payment_method' => $payload['payment_method'],
+                'customer_name' => $payload['customer_name'] ?? $transaction->customer_name ?? 'Pelanggan Umum',
+                'notes' => trim(($transaction->notes ?? '') . ' | Dibayar [' . $request->user()->name . ']: ' . now()->format('Y-m-d H:i:s')),
+            ]);
+
+            $this->decrementStockLevels(
+                (int) $transaction->store_id,
+                $transaction->items()->get()->map(function (TransactionItem $item): array {
+                    return [
+                        'product_id' => (int) $item->product_id,
+                        'quantity' => (int) $item->quantity,
+                    ];
+                })->all()
+            );
+        });
 
         return response()->json([
             'message' => 'Pembayaran berhasil.',
@@ -472,6 +535,47 @@ class KasirController extends Controller
 
         return view('kasir.receipt', [
             'transaction' => $transaction,
+        ]);
+    }
+
+    public function transactionHistory(Request $request)
+    {
+        abort_unless(in_array($request->user()?->role, ['cashier', 'admin', 'pelayan'], true), 403);
+
+        $storeId = $request->user()?->store_id;
+
+        $query = Transaction::query()
+            ->with(['user:user_id,name'])
+            ->where('store_id', $storeId)
+            ->where('status', 'completed');
+
+        if ($request->user()?->role === 'pelayan') {
+            $query->where('user_id', $request->user()->user_id);
+        }
+
+        $transactions = $query
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get()
+            ->map(function ($txn) {
+                return [
+                    'transaction_id' => $txn->transaction_id,
+                    'id' => $txn->transaction_id,
+                    'transaction_code' => $txn->transaction_code,
+                    'total_amount' => $txn->total_amount,
+                    'payment_method' => $txn->payment_method,
+                    'status' => $txn->status,
+                    'created_at' => $txn->created_at?->toIso8601String(),
+                    'served_by' => $txn->user?->name ?? '-',
+                    'customer_name' => $txn->customer_name ?? 'Pelanggan Umum',
+                    'notes' => $txn->notes,
+                    'receipt_url' => route('kasir.receipt', $txn->transaction_id),
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'transactions' => $transactions,
         ]);
     }
 }

@@ -15,6 +15,9 @@ class SalesReportDashboard extends Page
     protected static string $resource = SalesReportResource::class;
     protected static string $view = 'filament.resources.sales-report-resource.pages.sales-report-dashboard';
 
+    public ?int $storeId = null;
+    public array $stores = [];
+    public int $perPage = 10;
     public array $summaryRows = [];
     public array $topRows = [];
     public array $recentTransactions = [];
@@ -28,6 +31,43 @@ class SalesReportDashboard extends Page
 
     public function mount(): void
     {
+        // Fetch stores
+        $this->stores = \App\Models\Store::query()->pluck('name_store', 'store_id')->toArray();
+        
+        // Default to user's store_id if set, or null (all stores)
+        $userStoreId = auth()->user()?->store_id;
+        if ($userStoreId) {
+            $this->storeId = (int)$userStoreId;
+        } else {
+            $this->storeId = null;
+        }
+
+        $this->refreshData();
+    }
+
+    public function updatedStoreId(): void
+    {
+        $this->refreshData();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->loadRecentTransactions();
+    }
+
+    public function refreshData(): void
+    {
+        $this->summaryRows = [];
+        $this->topRows = [];
+        $this->recentTransactions = [];
+        $this->selectedTransaction = null;
+        $this->selectedTransactionItems = [];
+        $this->trendLabels = [];
+        $this->trendSales = [];
+        $this->trendTrx = [];
+        $this->topProductLabels = [];
+        $this->topProductQty = [];
+
         $periods = [
             'Harian' => now()->startOfDay(),
             'Mingguan' => now()->startOfWeek(),
@@ -40,6 +80,7 @@ class SalesReportDashboard extends Page
                 'periode' => $label,
                 'trx' => $summary['trx'],
                 'uang' => $summary['uang'],
+                'profit' => $summary['profit'],
             ];
 
             foreach ($this->getTopProducts($start, $label) as $row) {
@@ -51,7 +92,14 @@ class SalesReportDashboard extends Page
         $this->loadTopProductChartData();
         $this->loadRecentTransactions();
 
-        Log::info('Dashboard Data Loaded', [
+        $this->dispatch('sales-data-updated', [
+            'labels' => $this->trendLabels,
+            'sales' => $this->trendSales,
+            'trx' => $this->trendTrx,
+        ]);
+
+        Log::info('Dashboard Data Loaded & Refreshed', [
+            'storeId' => $this->storeId,
             'trendLabels' => count($this->trendLabels ?? []),
             'trendSales' => count($this->trendSales ?? []),
             'trendTrx' => count($this->trendTrx ?? []),
@@ -86,6 +134,11 @@ class SalesReportDashboard extends Page
 
         $q = DB::table('transactions as t');
 
+        $storeId = $this->storeId;
+        if ($storeId) {
+            $q->where('t.store_id', $storeId);
+        }
+
         if (Schema::hasTable('users') && Schema::hasColumn('transactions', 'user_id') && Schema::hasColumn('users', 'user_id')) {
             $q->leftJoin('users as u', 'u.user_id', '=', 't.user_id');
 
@@ -106,7 +159,7 @@ class SalesReportDashboard extends Page
             $q->whereIn('t.status', ['completed', 'paid', 'success', 'selesai']);
         }
 
-        $rows = $q->orderByDesc('t.created_at')->limit(20)->get();
+        $rows = $q->orderByDesc('t.created_at')->limit($this->perPage)->get();
 
         $this->recentTransactions = $rows->map(function ($x) {
             $cashier = '-';
@@ -148,23 +201,26 @@ class SalesReportDashboard extends Page
             ? "d.$subtotalCol as subtotal"
             : ($priceCol ? "(d.$qtyCol * d.$priceCol) as subtotal" : "0 as subtotal");
 
+        $unitSelect = Schema::hasColumn('products', 'unit') ? ", p.unit as unit" : ", 'pcs' as unit";
+
         return DB::table("$detailTable as d")
             ->join('products as p', "p.$prodPk", '=', "d.$prodFk")
             ->where("d.$trxFk", $transactionId)
-            ->selectRaw("p.$prodName as product_name, d.$qtyCol as qty, $selectHarga, $selectSubtotal")
+            ->selectRaw("p.$prodName as product_name, d.$qtyCol as qty, $selectHarga, $selectSubtotal $unitSelect")
             ->get()
             ->map(fn($x) => [
                 'product_name' => $x->product_name,
                 'qty' => (int) $x->qty,
                 'price' => (float) $x->price,
                 'subtotal' => (float) $x->subtotal,
+                'unit' => $x->unit ?? 'pcs',
             ])->toArray();
     }
 
     protected function getSummary(Carbon $start): array
     {
         if (!Schema::hasTable('transactions')) {
-            return ['trx' => 0, 'uang' => 0];
+            return ['trx' => 0, 'uang' => 0, 'profit' => 0];
         }
 
         $totalColumn = $this->firstExistingColumn('transactions', [
@@ -177,6 +233,11 @@ class SalesReportDashboard extends Page
 
         $query = DB::table('transactions')->where('created_at', '>=', $start);
 
+        $storeId = $this->storeId;
+        if ($storeId) {
+            $query->where('store_id', $storeId);
+        }
+
         if (Schema::hasColumn('transactions', 'status')) {
             $query->whereIn('status', ['paid', 'success', 'completed', 'selesai']);
         }
@@ -185,9 +246,51 @@ class SalesReportDashboard extends Page
             ->selectRaw("COUNT(*) as total_trx, COALESCE(SUM($totalColumn),0) as total_uang")
             ->first();
 
+        // Safe fallback profit to 20% of sales
+        $profit = (float) ($row->total_uang ?? 0) * 0.20;
+
+        // Try exact calculation if tables exist
+        $detailTable = $this->firstExistingTable(['transaction_items', 'transaction_details', 'sale_items', 'sales_items']);
+        if ($detailTable && Schema::hasTable('products')) {
+            $trxFk = $this->firstExistingColumn($detailTable, ['transaction_id', 'sale_id', 'sales_id']) ?? 'transaction_id';
+            $prodFk = $this->firstExistingColumn($detailTable, ['product_id', 'item_id']) ?? 'product_id';
+            $qtyCol = $this->firstExistingColumn($detailTable, ['quantity', 'qty', 'jumlah']) ?? 'quantity';
+            $priceCol = $this->firstExistingColumn($detailTable, ['unit_price', 'price', 'selling_price']);
+            $prodPk = $this->firstExistingColumn('products', ['product_id', 'id']) ?? 'product_id';
+            $priceExpr = $priceCol ? "d.$priceCol" : "0";
+
+            $qDetail = DB::table("$detailTable as d")
+                ->join('transactions as t', "t.transaction_id", '=', "d.$trxFk")
+                ->join('products as p', "p.$prodPk", '=', "d.$prodFk")
+                ->where('t.created_at', '>=', $start);
+
+            if ($storeId) {
+                $qDetail->where('t.store_id', $storeId);
+            }
+
+            if (Schema::hasColumn('transactions', 'status')) {
+                $qDetail->whereIn('t.status', ['paid', 'success', 'completed', 'selesai']);
+            }
+
+            $rowDetail = $qDetail
+                ->selectRaw("
+                    COUNT(DISTINCT t.transaction_id) as total_trx,
+                    COALESCE(SUM($priceExpr * d.$qtyCol), 0) as total_uang,
+                    COALESCE(SUM(($priceExpr - p.purchase_price) * d.$qtyCol), 0) as total_profit
+                ")
+                ->first();
+
+            return [
+                'trx' => (int) ($rowDetail->total_trx ?? 0),
+                'uang' => (float) ($rowDetail->total_uang ?? 0),
+                'profit' => (float) ($rowDetail->total_profit ?? 0),
+            ];
+        }
+
         return [
             'trx' => (int) ($row->total_trx ?? 0),
             'uang' => (float) ($row->total_uang ?? 0),
+            'profit' => $profit,
         ];
     }
 
@@ -218,9 +321,18 @@ class SalesReportDashboard extends Page
             ->join('products as p', "p.$prodPk", '=', "d.$prodFk")
             ->where('t.created_at', '>=', $start);
 
+        $storeId = $this->storeId;
+        if ($storeId) {
+            $query->where('t.store_id', $storeId);
+        }
+
         if (Schema::hasColumn('transactions', 'status')) {
             $query->whereIn('t.status', ['paid', 'success', 'completed', 'selesai']);
         }
+
+        $unitCol = $this->firstExistingColumn('products', ['unit']) ?? null;
+        $unitSelect = $unitCol ? ", p.$unitCol as unit" : ", 'pcs' as unit";
+        $unitGroupBy = $unitCol ? ", p.$unitCol" : "";
 
         return $query
             ->groupBy("p.$prodPk", "p.$prodName")
@@ -229,6 +341,7 @@ class SalesReportDashboard extends Page
                 p.$prodName as product_name,
                 SUM(d.$qtyCol) as qty,
                 $omzetExpr as omzet
+                $unitSelect
             ")
             ->orderByDesc('qty')
             ->limit(5)
@@ -238,6 +351,7 @@ class SalesReportDashboard extends Page
                 'product_name' => $x->product_name,
                 'qty' => (int) $x->qty,
                 'omzet' => (float) $x->omzet,
+                'unit' => $x->unit ?? 'pcs',
             ])
             ->toArray();
     }
@@ -274,6 +388,11 @@ class SalesReportDashboard extends Page
 
         $q = DB::table('transactions')
             ->where('created_at', '>=', $start);
+
+        $storeId = $this->storeId;
+        if ($storeId) {
+            $q->where('store_id', $storeId);
+        }
 
         if (Schema::hasColumn('transactions', 'status')) {
             $q->whereIn('status', ['paid', 'success', 'completed', 'selesai']);

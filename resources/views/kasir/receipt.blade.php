@@ -6,6 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Struk {{ $transaction->transaction_code }}</title>
     <style>
+        @page {
+            /* Hapus size: 80mm 210mm; agar tinggi kertas tidak dipaksa 21cm */
+            margin: 0;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -15,35 +20,42 @@
         body {
             font-family: 'Courier New', monospace;
             background: #f5f5f5;
-            padding: 20px;
+            padding: 12px;
             display: flex;
             justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            align-items: flex-start;
+            /* min-height: 100vh dihapus agar tinggi body mengikuti konten */
         }
 
         .receipt-wrapper {
             background: #fff;
-            max-width: 400px;
-            width: 100%;
+            width: 80mm;
+            box-sizing: border-box;
+            margin: 0 auto;
         }
 
         /* Thermal Printer Style - 80mm width */
         .thermal-receipt {
-            width: 100%;
-            padding: 12px;
+            width: 80mm;
+            padding: 5px 6px;
             font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.4;
+            font-size: 12px;
+            line-height: 1.1;
             background: #fff;
             color: #000;
+            box-sizing: border-box;
         }
 
         .thermal-header {
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             border-bottom: 1px dashed #000;
-            padding-bottom: 8px;
+            padding-bottom: 6px;
+        }
+
+        .thermal-divider {
+            border-bottom: 1px dashed #000;
+            margin: 6px 0;
         }
 
         .thermal-store-name {
@@ -75,31 +87,33 @@
         }
 
         .thermal-item {
-            display: flex;
-            justify-content: space-between;
+            font-family: 'Courier New', monospace;
             font-size: 12px;
-            margin-bottom: 4px;
-            word-break: break-word;
+            margin-bottom: 3px;
+            word-wrap: break-word;
+            line-height: 1.15;
         }
 
         .thermal-item-name {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .thermal-item-detail {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            padding: 0;
+        }
+
+        .thermal-item-qty-price {
             flex: 1;
-            padding-right: 8px;
+            text-align: left;
         }
 
-        .thermal-item-qty {
-            text-align: center;
-            min-width: 30px;
-        }
-
-        .thermal-item-price {
+        .thermal-item-price-right {
             text-align: right;
-            min-width: 70px;
-        }
-
-        .thermal-divider {
-            border-bottom: 1px dashed #000;
-            margin: 8px 0;
+            min-width: 60px;
         }
 
         .thermal-summary {
@@ -110,18 +124,34 @@
         .thermal-summary-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 3px;
+            font-size: 12px;
+            margin-bottom: 2px;
+            letter-spacing: 0.5px;
+        }
+
+        .thermal-summary-row span:first-child {
+            flex: 1;
+        }
+
+        .thermal-summary-row span:last-child {
+            text-align: right;
+            min-width: 70px;
         }
 
         .thermal-total {
             border-top: 1px solid #000;
             border-bottom: 1px solid #000;
-            padding: 6px 0;
-            margin: 8px 0;
+            padding: 4px 0;
+            margin: 6px 0;
             font-weight: bold;
             font-size: 13px;
             display: flex;
             justify-content: space-between;
+        }
+
+        .thermal-total span:last-child {
+            text-align: right;
+            min-width: 70px;
         }
 
         .thermal-footer {
@@ -148,7 +178,6 @@
             color: #666;
         }
 
-        /* Jagged edge untuk efek struk */
         .thermal-jagged {
             position: relative;
             margin-top: 12px;
@@ -165,27 +194,41 @@
             background: radial-gradient(3px at 3px 0, #fff 3px, transparent 3px);
             background-size: 6px 8px;
             background-repeat: repeat-x;
-            background-color: #f5f5f5;
+            background-color: #fff;
         }
 
-        /* Print styles */
+        /* PRINT STYLES - Diperbarui agar tinggi dinamis */
         @media print {
+            @page {
+                margin: 0;
+                size: auto;
+                /* Biarkan pengaturan Roll Paper Windows yang bekerja */
+            }
+
+            html,
             body {
                 background: #fff;
                 padding: 0;
                 margin: 0;
+                width: 100%;
+                height: auto !important;
             }
 
             .receipt-wrapper {
-                max-width: 80mm;
+                width: 100%;
+                /* Mengikuti lebar asli printable area (72.1mm) */
                 box-shadow: none;
                 margin: 0;
                 padding: 0;
             }
 
             .thermal-receipt {
-                padding: 8px;
+                width: 100%;
+                padding: 2mm 5mm !important;
+                /* Memberikan jarak aman kiri-kanan */
                 font-size: 12px;
+                box-sizing: border-box;
+                height: auto !important;
             }
 
             .no-print {
@@ -214,10 +257,6 @@
             margin-top: 20px;
             padding: 0 12px;
             justify-content: center;
-
-            no-print {
-                display: flex;
-            }
         }
 
         .btn {
@@ -257,6 +296,8 @@
             color: #374151;
             flex: 1;
             justify-content: center;
+            text-decoration: none;
+            /* Tambahan agar link terlihat seperti tombol */
         }
 
         .btn-back:hover {
@@ -282,7 +323,8 @@
             <div class="thermal-code">{{ $transaction->transaction_code }}</div>
             <div class="thermal-datetime">
                 {{ optional($transaction->created_at)->format('d/m/Y H:i') }}<br>
-                Kasir: {{ $transaction->user?->name ?? '-' }}
+                Kasir: {{ $transaction->user?->name ?? '-' }}<br>
+                Pembeli: {{ $transaction->customer_name ?? 'Pelanggan Umum' }}
             </div>
 
             <!-- Items -->
@@ -291,10 +333,16 @@
                 @foreach($transaction->items as $item)
                 <div class="thermal-item">
                     <div class="thermal-item-name">
-                        {{ substr($item->product?->product_name ?? 'Produk', 0, 18) }}<br>
-                        <span style="font-size:10px;">{{ (int)$item->quantity }} x Rp{{ number_format($item->unit_price, 0, ',', '.') }}</span>
+                        {{ substr($item->product?->product_name ?? 'Produk', 0, 19) }}
                     </div>
-                    <div class="thermal-item-price">Rp{{ number_format($item->subtotal, 0, ',', '.') }}</div>
+                    <div class="thermal-item-detail">
+                        <div class="thermal-item-qty-price">
+                            {{ (int)$item->quantity }} x {{ number_format($item->unit_price, 0, ',', '.') }}
+                        </div>
+                        <div class="thermal-item-price-right">
+                            {{ number_format($item->subtotal, 0, ',', '.') }}
+                        </div>
+                    </div>
                 </div>
                 @endforeach
             </div>
@@ -360,7 +408,7 @@
         </div>
 
         <div class="button-group no-print">
-            <a class="btn btn-back" href="{{ route('kasir.index') }}">
+            <a class="btn btn-back" href="{{ route('kasir.index') }}" onclick="handleBackToCashier(event)">
                 Kembali ke Kasir
             </a>
         </div>
@@ -368,6 +416,33 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
+        // Hide "Kembali ke Kasir" button if loaded inside an iframe (modal context)
+        if (window.self !== window.top) {
+            const backBtn = document.querySelector('.btn-back');
+            if (backBtn && backBtn.parentElement) {
+                backBtn.parentElement.style.display = 'none';
+            }
+        }
+
+        function handleBackToCashier(event) {
+            event.preventDefault();
+            
+            // If this page was opened via window.open (has an opener tab)
+            if (window.opener && !window.opener.closed) {
+                try {
+                    // Reload the parent/main tab to update its state
+                    window.opener.location.reload();
+                } catch (e) {
+                    console.error("Failed to reload opener page:", e);
+                }
+                // Close this current receipt tab/popup automatically
+                window.close();
+            } else {
+                // Otherwise, navigate the current tab normally
+                window.location.href = event.currentTarget.getAttribute('href');
+            }
+        }
+
         function downloadReceipt() {
             const element = document.querySelector('.thermal-receipt');
             const opt = {
@@ -383,7 +458,7 @@
                 jsPDF: {
                     orientation: 'portrait',
                     unit: 'mm',
-                    format: [80, 200]
+                    format: [80, 210]
                 }
             };
 
@@ -398,4 +473,4 @@
     </script>
 </body>
 
-</html> 
+</html>

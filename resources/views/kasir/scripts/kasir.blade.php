@@ -45,7 +45,17 @@
         if (countEl) countEl.innerText = list.length;
 
         if (!list.length) {
-            box.innerHTML = `...`;
+            box.innerHTML = `
+                <div style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; text-align: center;">
+                    <div style="width: 72px; height: 72px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" style="width: 32px; height: 32px; color: #94a3b8;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    <div style="font-size: 15px; font-weight: 700; color: #334155; margin-bottom: 6px;">Barang Kosong</div>
+                    <div style="font-size: 13px; color: #64748b; max-width: 250px;">Belum ada barang di toko ini atau kata kunci tidak ditemukan.</div>
+                </div>
+            `;
             return;
         }
 
@@ -230,18 +240,24 @@
         }
 
         const redirectPage = options.redirectPage || 'kasir';
-        const form = new FormData();
-        form.append('cart', JSON.stringify(cart));
-        form.append('payment', 0);
-        form.append('payment_method', 'cash');
+        const customerNameInput = document.getElementById('quickCustomerName');
+        const customerName = customerNameInput?.value?.trim() || 'Pelanggan Umum';
+
+        console.log('📝 Customer Name:', customerName);
+
+        const params = new URLSearchParams();
+        params.append('cart', JSON.stringify(cart));
+        params.append('payment', 0);
+        params.append('payment_method', 'cash');
+        params.append('customer_name', customerName);
 
         fetch('{{ route("kasir.order.store") }}', {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Accept': 'application/json',
                 },
-                body: form,
+                body: params,
             })
             .then(async (r) => {
                 const text = await r.text();
@@ -276,20 +292,13 @@
         if (msgEl) msgEl.textContent = message;
         if (printBtn) printBtn.style.display = 'none';
 
+        const iframeContainer = document.getElementById('receiptIframeContainer');
+        if (iframeContainer) iframeContainer.style.display = 'none';
+
         modal.classList.remove('hidden');
     }
 
-    function closeReceiptModal() {
-        const modal = document.getElementById('receiptModal');
-        if (modal) modal.classList.add('hidden');
-    }
 
-    document.addEventListener('click', function(e) {
-        const modal = document.getElementById('receiptModal');
-        if (!modal) return;
-        const backdrop = modal.querySelector('.receipt-modal__backdrop');
-        if (e.target === backdrop) closeReceiptModal();
-    });
 
     function quickHoldOrder() {
         if (!cart.length) return showCenterMessage('Keranjang masih kosong.');

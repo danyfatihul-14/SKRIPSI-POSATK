@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \App\Models\Product::observe(\App\Observers\ProductObserver::class);
         FilamentIcon::register([
             'panels::sidebar.collapse-button' => 'heroicon-m-bars-3',
             'panels::sidebar.collapse-button.rtl' => 'heroicon-m-bars-3',

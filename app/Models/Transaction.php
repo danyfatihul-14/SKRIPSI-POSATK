@@ -17,6 +17,7 @@ class Transaction extends Model
         'store_id',
         'user_id',
         'transaction_code',
+        'customer_name',
         'subtotal',
         'tax',
         'discount',
