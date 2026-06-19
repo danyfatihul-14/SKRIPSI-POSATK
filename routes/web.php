@@ -28,6 +28,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/kasir/midtrans-notification', [KasirController::class, 'midtransNotification'])->name('kasir.midtrans-notification')->withoutMiddleware(['auth:sanctum']);
     Route::get('/kasir/receipt/{transaction}', [KasirController::class, 'receipt'])->name('kasir.receipt');
     Route::get('/kasir/transaction-history', [KasirController::class, 'transactionHistory'])->name('kasir.transaction-history');
+    Route::post('/kasir/stok/adjust', [KasirController::class, 'adjustStock'])->name('kasir.stok.adjust');
+    Route::post('/kasir/stok/convert', [KasirController::class, 'convertStock'])->name('kasir.stok.convert');
+    Route::get('/kasir/categories', [KasirController::class, 'getCategories'])->name('kasir.categories');
+    Route::post('/kasir/products', [KasirController::class, 'storeProduct'])->name('kasir.products.store');
     Route::get('/cashier', function () {
         return view('kasir.dashboard');})->name('cashier');
 });

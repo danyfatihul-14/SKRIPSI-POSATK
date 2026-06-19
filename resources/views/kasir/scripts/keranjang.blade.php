@@ -69,8 +69,15 @@
 
     function updateQty(idx, change) {
         if (!cart[idx]) return;
-        cart[idx].qty += change;
-        if (cart[idx].qty <= 0) {
+        const item = cart[idx];
+
+        if (change > 0 && item.maxStock !== undefined && item.qty + change > item.maxStock) {
+            window.showAlert(`Stok tidak mencukupi! Maksimal pembelian untuk barang ini adalah ${item.maxStock}.`, 'warning');
+            return;
+        }
+
+        item.qty += change;
+        if (item.qty <= 0) {
             cart.splice(idx, 1);
         }
         updateCartBadge();
@@ -135,10 +142,10 @@
             .catch(e => window.showAlert('Fetch error: ' + e.message, 'error'));
     }
 
-    let heldCarts = JSON.parse(localStorage.getItem('heldCarts') || '[]');
+    // heldCarts is declared globally in kasir scripts
 
     function saveHeldCarts() {
-        localStorage.setItem('heldCarts', JSON.stringify(heldCarts));
+        localStorage.setItem(heldCartsKey, JSON.stringify(heldCarts));
     }
 
     function renderQueueList() {
@@ -227,10 +234,14 @@
 
     function deleteHeldCart(index) {
         if (!heldCarts[index]) return;
-        if (!window.showConfirm('Hapus antrian ini?')) return;
-        heldCarts.splice(index, 1);
-        saveHeldCarts();
-        renderQueueList();
+        window.showConfirm('Hapus antrian ini?', () => {
+            heldCarts.splice(index, 1);
+            saveHeldCarts();
+            renderQueueList();
+            if (typeof updateCartBadge === 'function') {
+                updateCartBadge();
+            }
+        });
     }
 
     function activateHeldCart(index) {

@@ -108,6 +108,8 @@ class KasirController extends Controller
                         'subtotal'       => $item['subtotal'],
                     ]);
                 }
+
+                $this->decrementStockLevels((int) $request->user()->store_id, $items);
             });
 
             return response()->json([
@@ -411,8 +413,60 @@ class KasirController extends Controller
                 ]);
             }
 
+            $oldStock = (int) $stockLevel->quantity;
             $stockLevel->quantity = (int) $stockLevel->quantity - $quantity;
             $stockLevel->save();
+
+            // Record stock log for sales
+            \App\Models\StockLog::create([
+                'store_id'        => $storeId,
+                'product_id'      => $productId,
+                'user_id'         => auth()->id(),
+                'type'            => 'sale',
+                'old_quantity'    => $oldStock,
+                'new_quantity'    => $stockLevel->quantity,
+                'quantity_change' => -$quantity,
+                'notes'           => 'Pengurangan stok penjualan',
+            ]);
+        }
+    }
+
+    /**
+     * Kembalikan stok produk sesuai item transaksi.
+     */
+    private function incrementStockLevels(int $storeId, array $items): void
+    {
+        foreach ($items as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            $quantity = (int) ($item['quantity'] ?? 0);
+
+            if ($productId <= 0 || $quantity <= 0) {
+                continue;
+            }
+
+            $stockLevel = StockLevel::query()
+                ->where('store_id', $storeId)
+                ->where('product_id', $productId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($stockLevel) {
+                $oldStock = (int) $stockLevel->quantity;
+                $stockLevel->quantity = (int) $stockLevel->quantity + $quantity;
+                $stockLevel->save();
+
+                // Record stock log for restoration
+                \App\Models\StockLog::create([
+                    'store_id'        => $storeId,
+                    'product_id'      => $productId,
+                    'user_id'         => auth()->id(),
+                    'type'            => 'adjustment',
+                    'old_quantity'    => $oldStock,
+                    'new_quantity'    => $stockLevel->quantity,
+                    'quantity_change' => $quantity,
+                    'notes'           => 'Pengembalian stok dari pembatalan waiting payment',
+                ]);
+            }
         }
     }
 
@@ -484,16 +538,6 @@ class KasirController extends Controller
                 'customer_name' => $payload['customer_name'] ?? $transaction->customer_name ?? 'Pelanggan Umum',
                 'notes' => trim(($transaction->notes ?? '') . ' | Dibayar [' . $request->user()->name . ']: ' . now()->format('Y-m-d H:i:s')),
             ]);
-
-            $this->decrementStockLevels(
-                (int) $transaction->store_id,
-                $transaction->items()->get()->map(function (TransactionItem $item): array {
-                    return [
-                        'product_id' => (int) $item->product_id,
-                        'quantity' => (int) $item->quantity,
-                    ];
-                })->all()
-            );
         });
 
         return response()->json([
@@ -515,6 +559,15 @@ class KasirController extends Controller
         }
 
         DB::transaction(function () use ($transaction) {
+            $items = $transaction->items()->get()->map(function (TransactionItem $item): array {
+                return [
+                    'product_id' => (int) $item->product_id,
+                    'quantity' => (int) $item->quantity,
+                ];
+            })->all();
+
+            $this->incrementStockLevels((int) $transaction->store_id, $items);
+
             $transaction->items()->delete();
             $transaction->delete();
         });
@@ -576,6 +629,210 @@ class KasirController extends Controller
         return response()->json([
             'status' => 'success',
             'transactions' => $transactions,
+        ]);
+    }
+
+    public function adjustStock(Request $request)
+    {
+        $request->validate([
+            'product_id' => 'required|exists:products,product_id',
+            'quantity'   => 'required|integer|min:0',
+        ]);
+
+        $storeId   = $request->user()->store_id;
+        $productId = $request->input('product_id');
+        $quantity  = $request->input('quantity');
+
+        // Get product to check unit price for stock subtotal calculation
+        $product = Product::findOrFail($productId);
+        $unitPrice = $product->selling_price;
+
+        // Fetch old quantity before updating
+        $oldStock = StockLevel::where('store_id', $storeId)->where('product_id', $productId)->value('quantity') ?? 0;
+
+        $stockLevel = StockLevel::updateOrCreate(
+            ['store_id' => $storeId, 'product_id' => $productId],
+            [
+                'quantity'   => $quantity,
+                'unit_price' => $unitPrice,
+                'discount'   => 0
+            ]
+        );
+
+        // Record stock log for manual adjustment
+        \App\Models\StockLog::create([
+            'store_id'        => $storeId,
+            'product_id'      => $productId,
+            'user_id'         => $request->user()?->user_id,
+            'type'            => 'adjustment',
+            'old_quantity'    => $oldStock,
+            'new_quantity'    => $quantity,
+            'quantity_change' => $quantity - $oldStock,
+            'notes'           => 'Penyesuaian stok manual oleh ' . ($request->user()?->name ?? 'System'),
+        ]);
+
+        return response()->json([
+            'status'   => 'success',
+            'message'  => 'Stok ' . $product->product_name . ' berhasil diperbarui menjadi ' . $quantity,
+            'quantity' => $stockLevel->quantity
+        ]);
+    }
+
+    public function convertStock(Request $request)
+    {
+        $request->validate([
+            'source_product_id' => 'required|exists:products,product_id',
+            'target_product_id' => 'required|exists:products,product_id|different:source_product_id',
+            'source_quantity'   => 'required|integer|min:1',
+            'ratio'             => 'required|integer|min:1',
+        ]);
+
+        $storeId   = $request->user()->store_id;
+        $sourceId  = $request->input('source_product_id');
+        $targetId  = $request->input('target_product_id');
+        $sourceQty = $request->input('source_quantity');
+        $ratio     = $request->input('ratio');
+
+        $targetAddQty = $sourceQty * $ratio;
+
+        return DB::transaction(function () use ($storeId, $sourceId, $targetId, $sourceQty, $targetAddQty, $request) {
+            // 1. Check source stock
+            $sourceStock = StockLevel::where('store_id', $storeId)
+                ->where('product_id', $sourceId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$sourceStock || $sourceStock->quantity < $sourceQty) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Stok produk asal tidak mencukupi untuk dikonversi.'
+                ], 422);
+            }
+
+            $oldSourceQty = $sourceStock->quantity;
+
+            // 2. Deduct source stock
+            $sourceStock->quantity -= $sourceQty;
+            $sourceStock->save();
+
+            // Record source stock log (conversion deduction)
+            \App\Models\StockLog::create([
+                'store_id'        => $storeId,
+                'product_id'      => $sourceId,
+                'user_id'         => $request->user()?->user_id,
+                'type'            => 'conversion_out',
+                'old_quantity'    => $oldSourceQty,
+                'new_quantity'    => $sourceStock->quantity,
+                'quantity_change' => -$sourceQty,
+                'notes'           => 'Pemecahan/konversi stok (dikurangi) oleh ' . ($request->user()?->name ?? 'System'),
+            ]);
+
+            // 3. Add to target stock
+            $targetProduct = Product::findOrFail($targetId);
+            $targetStock = StockLevel::where('store_id', $storeId)
+                ->where('product_id', $targetId)
+                ->lockForUpdate()
+                ->first();
+
+            $oldTargetQty = $targetStock ? $targetStock->quantity : 0;
+
+            if ($targetStock) {
+                $targetStock->quantity += $targetAddQty;
+                $targetStock->save();
+            } else {
+                $targetStock = StockLevel::create([
+                    'store_id'   => $storeId,
+                    'product_id' => $targetId,
+                    'quantity'   => $targetAddQty,
+                    'unit_price' => $targetProduct->selling_price,
+                    'discount'   => 0
+                ]);
+            }
+
+            // Record target stock log (conversion addition)
+            \App\Models\StockLog::create([
+                'store_id'        => $storeId,
+                'product_id'      => $targetId,
+                'user_id'         => $request->user()?->user_id,
+                'type'            => 'conversion_in',
+                'old_quantity'    => $oldTargetQty,
+                'new_quantity'    => $targetStock->quantity,
+                'quantity_change' => $targetAddQty,
+                'notes'           => 'Pemecahan/konversi stok (ditambah) oleh ' . ($request->user()?->name ?? 'System'),
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Konversi berhasil. Stok asal berkurang ' . $sourceQty . ', stok tujuan bertambah ' . $targetAddQty
+            ]);
+        });
+    }
+
+    public function getCategories(Request $request)
+    {
+        $categories = \App\Models\Category::all(['category_id', 'category_name']);
+        return response()->json($categories);
+    }
+
+    public function storeProduct(Request $request)
+    {
+        $request->validate([
+            'product_name' => ['required', 'string', 'max:255'],
+            'category_id'  => ['nullable', 'exists:categories,category_id'],
+            'variant'      => ['nullable', 'string', 'max:100'],
+            'unit'         => ['nullable', 'string', 'max:50'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
+            'initial_stock' => ['nullable', 'integer', 'min:0'],
+            'image'         => ['nullable', 'image', 'max:2048'],
+        ]);
+
+        $storeId = $request->user()->store_id;
+        if (!$storeId) {
+            return response()->json(['message' => 'User tidak terasosiasi dengan Store mana pun.'], 422);
+        }
+
+        $fileUrl = null;
+        if ($request->hasFile('image')) {
+            $fileUrl = $request->file('image')->store('products', 'public');
+        }
+
+        $product = DB::transaction(function () use ($request, $storeId, $fileUrl) {
+            $product = Product::create([
+                'category_id'    => $request->input('category_id'),
+                'product_name'  => $request->input('product_name'),
+                'variant'       => $request->input('variant') ?: '-',
+                'unit'          => $request->input('unit') ?: '-',
+                'purchase_price'=> 0,
+                'selling_price' => $request->input('selling_price'),
+                'file_url'      => $fileUrl,
+            ]);
+
+            StockLevel::create([
+                'store_id'   => $storeId,
+                'product_id' => $product->product_id,
+                'quantity'   => $request->input('initial_stock') ?? 0,
+                'unit_price' => $request->input('selling_price'),
+                'discount'   => 0,
+            ]);
+
+            // Record stock log for initial stock creation
+            \App\Models\StockLog::create([
+                'store_id'        => $storeId,
+                'product_id'      => $product->product_id,
+                'user_id'         => $request->user()->user_id,
+                'type'            => 'adjustment',
+                'old_quantity'    => 0,
+                'new_quantity'    => $request->input('initial_stock') ?? 0,
+                'quantity_change' => $request->input('initial_stock') ?? 0,
+                'notes'           => 'Stok awal produk baru yang ditambahkan dari Kasir',
+            ]);
+
+            return $product;
+        });
+
+        return response()->json([
+            'message' => 'Produk baru berhasil ditambahkan.',
+            'product' => $product,
         ]);
     }
 }

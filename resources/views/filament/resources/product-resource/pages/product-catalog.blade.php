@@ -217,6 +217,10 @@
                     Varian: {{ $product['variant'] ?? '-' }}
                 </p>
 
+                <p class="product-category" style="color:#4b5563; font-weight:700; margin-bottom:2px; font-size:10px;">
+                    Satuan: {{ $product['unit'] ?? '-' }}
+                </p>
+
                 <p class="product-category" style="font-size:10px;">{{ $product['category_name'] ?? '-' }}</p>
 
                 <div class="product-info">

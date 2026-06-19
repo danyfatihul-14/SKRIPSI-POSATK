@@ -233,6 +233,164 @@
             width: 100%;
         }
     }
+
+    /* Modal Pemilihan Varian */
+    .variant-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .variant-modal.hidden {
+        display: none !important;
+    }
+
+    .variant-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(4px);
+    }
+
+    .variant-modal__dialog {
+        position: relative;
+        z-index: 1;
+        width: min(92vw, 480px);
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        animation: variantModalZoomIn 0.2s ease-out;
+    }
+
+    @keyframes variantModalZoomIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .variant-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 12px;
+    }
+
+    .variant-modal__title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--dark);
+        margin: 0;
+    }
+
+    .variant-modal__close {
+        border: none;
+        background: transparent;
+        font-size: 20px;
+        cursor: pointer;
+        color: #94a3b8;
+        padding: 4px;
+        line-height: 1;
+    }
+
+    .variant-modal__close:hover {
+        color: #64748b;
+    }
+
+    .variant-options-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 4px;
+    }
+
+    @media (max-width: 480px) {
+        .variant-options-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .variant-option-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        background: #fff;
+    }
+
+    .variant-option-card:hover {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+    }
+
+    .variant-qty-selector {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .variant-qty-btn {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--accent);
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+    }
+
+    .variant-qty-btn:hover {
+        background: #f1f5f9;
+    }
+
+    .variant-qty-input {
+        width: 60px;
+        text-align: center;
+        border: none;
+        background: transparent;
+        font-weight: 700;
+        font-size: 16px;
+        outline: none;
+    }
+
+    .variant-modal__footer {
+        display: flex;
+        gap: 12px;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 16px;
+    }
+
+    .variant-modal__footer button {
+        flex: 1;
+        padding: 10px;
+        font-weight: 700;
+        border-radius: 8px;
+        cursor: pointer;
+    }
 </style>
 
 <div id="page-kasir" class="page h-full flex flex-col active" style="background: var(--light);">
@@ -241,11 +399,19 @@
             <div class="kasir-left">
                 <div style="padding: 12px 14px; border-bottom: 1px solid var(--accent); display:flex; align-items:center; justify-content:space-between; gap:10px;">
                     <span style="font-weight:700; color:var(--dark);">Daftar Barang</span>
-                    <input
-                        id="productSearch"
-                        type="text"
-                        placeholder="Cari produk..."
-                        style="width:220px; max-width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button type="button" onclick="openAddProductModal()" style="border: 1px solid var(--accent); background: var(--accent); color: white; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: opacity .15s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Tambah Produk
+                        </button>
+                        <input
+                            id="productSearch"
+                            type="text"
+                            placeholder="Cari produk..."
+                            style="width:200px; max-width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                    </div>
                 </div>
                 <div style="flex:1; overflow-y:auto; padding: 16px;">
                     <div id="productList" class="product-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px;"></div>
@@ -298,5 +464,144 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Modal Pemilihan Varian -->
+<div id="variantModal" class="variant-modal hidden">
+    <div class="variant-modal__backdrop" onclick="closeVariantModal()"></div>
+    <div class="variant-modal__dialog">
+        <div class="variant-modal__header">
+            <h5 id="variantModalTitle" class="variant-modal__title">Pilih Varian</h5>
+            <button type="button" class="variant-modal__close" onclick="closeVariantModal()">×</button>
+        </div>
+        <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;">Varian Tersedia</div>
+        <div id="variantOptionsContainer" class="variant-options-grid">
+            <!-- Pilihan varian dimuat secara dinamis via JS -->
+        </div>
+        
+        <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px;">Kuantitas</div>
+        <div class="variant-qty-selector">
+            <span style="font-size: 14px; font-weight: 600; color: var(--dark);">Jumlah</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="variant-qty-btn" onclick="updateVariantQty(-1)">-</button>
+                <input type="text" id="variantQtyInput" class="variant-qty-input" value="1" readonly />
+                <button type="button" class="variant-qty-btn" onclick="updateVariantQty(1)">+</button>
+            </div>
+        </div>
+        
+        <div id="variantStockWarning" style="display: none; color: #ef4444; font-size: 12px; font-weight: 600; text-align: center;">
+            Stok tidak mencukupi!
+        </div>
+
+        <div class="variant-modal__footer">
+            <button type="button" class="btn-secondary" onclick="closeVariantModal()" style="border: 1px solid #cbd5e1; background: #fff;">Batal</button>
+            <button id="variantModalAddBtn" type="button" class="btn-primary" onclick="addSelectedVariantToCart()">Tambah ke Keranjang</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Produk Baru -->
+<div id="addProductModal" class="variant-modal hidden">
+    <div class="variant-modal__backdrop" onclick="closeAddProductModal()"></div>
+    <div class="variant-modal__dialog">
+        <div class="variant-modal__header">
+            <h5 class="variant-modal__title">Tambah Produk Baru</h5>
+            <button type="button" class="variant-modal__close" onclick="closeAddProductModal()">×</button>
+        </div>
+        
+        <form id="addProductForm" onsubmit="submitNewProduct(event)" style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
+            @csrf
+            <div>
+                <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Nama Produk</label>
+                <input type="text" id="addProductName" required placeholder="Masukkan nama produk..." 
+                    style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+            </div>
+
+            <div>
+                <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Kategori</label>
+                <select id="addProductCategory" 
+                    style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; background:white;">
+                    <option value="">Pilih Kategori (opsional)...</option>
+                </select>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Varian</label>
+                    <input type="text" id="addProductVariant" placeholder="Contoh: Merah (opsional)" 
+                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                </div>
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Satuan</label>
+                    <input type="text" id="addProductUnit" placeholder="Contoh: biji, pack" 
+                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Harga Jual (Rp)</label>
+                    <input type="number" id="addProductSellingPrice" required min="0" placeholder="Contoh: 15000" 
+                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                </div>
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Stok Awal</label>
+                    <input type="number" id="addProductInitialStock" min="0" value="0" 
+                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                </div>
+            </div>
+
+            <div>
+                <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Gambar Produk</label>
+                
+                {{-- Toggle Buttons --}}
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <button type="button" id="btnModeUpload" onclick="switchImageMode('upload')" 
+                        style="flex: 1; padding: 6px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: white; cursor: pointer; transition: all 0.2s;">
+                        Upload File
+                    </button>
+                    <button type="button" id="btnModeCamera" onclick="switchImageMode('camera')" 
+                        style="flex: 1; padding: 6px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #4b5563; cursor: pointer; transition: all 0.2s;">
+                        Ambil Foto (Kamera)
+                    </button>
+                </div>
+
+                {{-- Upload File Container --}}
+                <div id="containerUploadImage">
+                    <input type="file" id="addProductImage" accept="image/*" 
+                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; background:white;" />
+                </div>
+
+                {{-- Camera Container --}}
+                <div id="containerCameraImage" style="display: none; flex-direction: column; gap: 8px;">
+                    <div style="position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; min-height: 150px; display: flex; align-items: center; justify-content: center;">
+                        <video id="cameraVideo" autoplay playsinline style="width: 100%; height: 150px; object-fit: cover; display: none;"></video>
+                        <img id="capturedImage" style="width: 100%; height: 150px; object-fit: cover; display: none;" />
+                        <span id="cameraPlaceholder" style="color: #94a3b8; font-size: 12px; font-weight: 600;">Kamera Belum Aktif</span>
+                    </div>
+
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" id="btnStartCamera" onclick="startCamera()" 
+                            style="flex: 1; padding: 6px; font-size: 11px; font-weight: 700; border: 1px solid var(--accent); background: white; color: var(--accent); border-radius: 6px; cursor: pointer;">
+                            Aktifkan Kamera
+                        </button>
+                        <button type="button" id="btnCapturePhoto" onclick="capturePhoto()" disabled 
+                            style="flex: 1; padding: 6px; font-size: 11px; font-weight: 700; border: 1px solid #10b981; background: #10b981; color: white; border-radius: 6px; cursor: pointer; opacity: 0.5;">
+                            Ambil Foto
+                        </button>
+                        <button type="button" id="btnResetPhoto" onclick="resetPhoto()" style="display: none; padding: 6px 12px; font-size: 11px; font-weight: 700; border: 1px solid #ef4444; background: #ef4444; color: white; border-radius: 6px; cursor: pointer;">
+                            Ulangi
+                        </button>
+                    </div>
+                    <canvas id="cameraCanvas" style="display: none;"></canvas>
+                </div>
+            </div>
+
+            <div class="variant-modal__footer" style="margin-top: 8px;">
+                <button type="button" class="btn-secondary" onclick="closeAddProductModal()" style="border: 1px solid #cbd5e1; background: #fff; flex: 1;">Batal</button>
+                <button type="submit" class="btn-primary" style="flex: 1;">Simpan Produk</button>
+            </div>
+        </form>
     </div>
 </div>

@@ -143,6 +143,20 @@
                 <span id="cartBadgeSidebar" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">0</span>
             </button>
 
+            {{-- Update Stok --}}
+            <button onclick="showPage('stok')" id="nav-stok"
+                class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/10 hover:text-white transition-all duration-200 group">
+                <div class="nav-icon w-9 h-9 rounded-lg bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-all duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6H16" />
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <div class="text-sm font-semibold text-white">Update Stok</div>
+                    <div class="nav-sub text-xs text-white/40">Kelola & konversi stok</div>
+                </div>
+            </button>
+
             {{-- Transaksi --}}
             @if (! $isWaiter)
             <button onclick="showPage('transaksi')" id="nav-transaksi"
@@ -197,6 +211,7 @@
 
         @include('kasir.pages.kasir')
         @include('kasir.pages.keranjang')
+        @include('kasir.pages.stok')
         @unless ($isWaiter)
         @include('kasir.scripts.pending')
         @include('kasir.pages.transaksi')
@@ -329,6 +344,10 @@
             }
         }
 
+        if (page === 'stok' && typeof initStockPage === 'function') {
+            initStockPage();
+        }
+
         if (window.matchMedia('(max-width: 1024px)').matches) {
             closeCashierSidebar();
         }
@@ -361,6 +380,7 @@
 </script>
 @include('kasir.scripts.kasir')
 @include('kasir.scripts.keranjang')
+@include('kasir.scripts.stok')
 @unless ($isWaiter)
 @include('kasir.scripts.transaksi')
 @endunless

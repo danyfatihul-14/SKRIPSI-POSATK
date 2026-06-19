@@ -588,6 +588,16 @@
                     <span id="holdBadgeSidebar" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px;">0</span>
                 </button>
 
+                <button onclick="showPage('stok')" id="nav-stok" class="nav-link">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:18px; height:18px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6H16" />
+                    </svg>
+                    <div>
+                        <span style="display:block; font-size:14px;">Update Stok</span>
+                        <span class="nav-desc">Kelola & konversi stok</span>
+                    </div>
+                </button>
+
                 <button onclick="showPage('history')" id="nav-history" class="nav-link">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -651,6 +661,16 @@
                     </div>
                 </button>
 
+                <button onclick="showPage('stok')" id="nav-stok" class="nav-link">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:18px; height:18px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 6H16" />
+                    </svg>
+                    <div>
+                        <span style="display:block; font-size:14px;">Update Stok</span>
+                        <span class="nav-desc">Kelola & konversi stok</span>
+                    </div>
+                </button>
+
                 <button onclick="showPage('history')" id="nav-history" class="nav-link">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -682,12 +702,14 @@
             @if ($isWaiter)
             @include('kasir.pages.kasir')
             @include('kasir.pages.keranjang')
+            @include('kasir.pages.stok')
             @include('kasir.pages.history')
             @else
             @include('kasir.pages.kasir')
             @include('kasir.pages.keranjang')
             @include('kasir.pages.pending')
             @include('kasir.pages.transaksi')
+            @include('kasir.pages.stok')
             @include('kasir.pages.history')
             @endif
         </div>
@@ -713,6 +735,7 @@
 
     @include('kasir.scripts.kasir')
     @include('kasir.scripts.keranjang')
+    @include('kasir.scripts.stok')
     @if (! $isWaiter)
     @include('kasir.scripts.pending')
     @include('kasir.scripts.transaksi')
@@ -751,6 +774,9 @@
                 if (typeof renderOrderSummary === 'function') {
                     renderOrderSummary();
                 }
+            }
+            if (page === 'stok' && typeof initStockPage === 'function') {
+                initStockPage();
             }
             if (page === 'history' && typeof loadTransactionHistory === 'function') {
                 loadTransactionHistory();

@@ -82,6 +82,7 @@ class ProductCatalog extends Page
                 'product_id'     => $product->product_id,
                 'product_name'   => $product->product_name,
                 'variant'        => $product->variant ?: '-',
+                'unit'           => $product->unit ?? '-',
                 'category_name'  => $product->category?->category_name ?? '-',
                 'file_url'       => $product->file_url,
                 'selling_price'  => (float) ($product->selling_price ?? 0),
