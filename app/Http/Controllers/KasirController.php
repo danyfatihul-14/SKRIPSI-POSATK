@@ -421,7 +421,7 @@ class KasirController extends Controller
             \App\Models\StockLog::create([
                 'store_id'        => $storeId,
                 'product_id'      => $productId,
-                'user_id'         => auth()->id(),
+                'user_id'         => auth()->user()?->user_id,
                 'type'            => 'sale',
                 'old_quantity'    => $oldStock,
                 'new_quantity'    => $stockLevel->quantity,
@@ -459,7 +459,7 @@ class KasirController extends Controller
                 \App\Models\StockLog::create([
                     'store_id'        => $storeId,
                     'product_id'      => $productId,
-                    'user_id'         => auth()->id(),
+                    'user_id'         => auth()->user()?->user_id,
                     'type'            => 'adjustment',
                     'old_quantity'    => $oldStock,
                     'new_quantity'    => $stockLevel->quantity,
@@ -584,6 +584,7 @@ class KasirController extends Controller
         $transaction->load([
             'user:user_id,name',
             'items.product:product_id,product_name',
+            'store',
         ]);
 
         return view('kasir.receipt', [

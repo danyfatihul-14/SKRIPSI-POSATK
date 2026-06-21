@@ -733,6 +733,85 @@
         </div>
     </div>
 
+    {{-- Global Receipt Modal --}}
+    <div id="receiptModal" class="receipt-modal hidden">
+        <div class="receipt-modal__backdrop"></div>
+
+        <div class="receipt-modal__dialog" style="padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:90vh;">
+            <div style="padding:20px 20px 10px; z-index:2; text-align:center;">
+                <h3 class="receipt-modal__title" id="receiptModalTitle" style="margin:0;">Pembayaran Berhasil</h3>
+                <p class="receipt-modal__message" id="receiptModalMessage" style="margin:8px 0 0; font-size:14px;">Struk siap dicetak.</p>
+            </div>
+            
+            <div id="receiptIframeContainer" style="flex:1; background:#fff; position:relative; display:none; min-height:450px;">
+                <iframe id="receiptIframe" style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; background:#fff; display:block;"></iframe>
+            </div>
+
+            <div class="receipt-modal__actions" style="padding:15px 20px 20px; text-align:center; display:flex; gap:10px; justify-content:center;">
+                <button type="button" class="btn-secondary" id="receiptModalCloseBtn" onclick="closeReceiptModal()" style="flex:1;">Kembali ke Kasir</button>
+                <button type="button" class="btn-primary" id="receiptModalPrintBtn" style="flex:1; display:none;">Cetak Struk</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.askPrintReceipt = function(receiptUrl) {
+            if (!receiptUrl) return;
+            
+            const modal = document.getElementById('receiptModal');
+            if (!modal) {
+                window.open(receiptUrl, "_blank", "width=420,height=760");
+                return;
+            }
+            
+            const titleEl = document.getElementById('receiptModalTitle');
+            const msgEl = document.getElementById('receiptModalMessage');
+            const iframeContainer = document.getElementById('receiptIframeContainer');
+            const iframe = document.getElementById('receiptIframe');
+            const printBtn = document.getElementById('receiptModalPrintBtn');
+            
+            if (titleEl) titleEl.textContent = 'Pratinjau Struk';
+            if (msgEl) msgEl.textContent = 'Pratinjau struk Anda di bawah ini.';
+            
+            if (iframeContainer) iframeContainer.style.display = 'block';
+            if (iframe) iframe.src = receiptUrl;
+            
+            if (printBtn) {
+                printBtn.style.display = 'block';
+                printBtn.onclick = function() {
+                    const isAndroid = /Android/i.test(navigator.userAgent);
+                    if (isAndroid) {
+                        const absoluteUrl = new URL(receiptUrl, window.location.href).href;
+                        const intentUrl = 'intent:' + encodeURI(absoluteUrl) + '#Intent;' +
+                                          'component=ru.a402d.rawbtprinter.activity.PrintDownloadActivity;' +
+                                          'package=ru.a402d.rawbtprinter;end;';
+                        window.location.href = intentUrl;
+                    } else {
+                        if (iframe.contentWindow) {
+                            iframe.contentWindow.focus();
+                            iframe.contentWindow.print();
+                        }
+                    }
+                };
+            }
+            
+            modal.classList.remove('hidden');
+        };
+
+        window.closeReceiptModal = function() {
+            const modal = document.getElementById('receiptModal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        // Close modal when backdrop is clicked
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('receiptModal');
+            if (!modal) return;
+            const backdrop = modal.querySelector('.receipt-modal__backdrop');
+            if (e.target === backdrop) window.closeReceiptModal();
+        });
+    </script>
+
     @include('kasir.scripts.kasir')
     @include('kasir.scripts.keranjang')
     @include('kasir.scripts.stok')

@@ -143,14 +143,17 @@
     }
 
     function printReceipt(receiptUrl) {
+        console.log('printReceipt called with:', receiptUrl);
         if (!receiptUrl || receiptUrl === '#') {
             window.showAlert('Struk tidak tersedia untuk transaksi ini.', 'warning');
             return;
         }
 
-        if (typeof askPrintReceipt === 'function') {
-            askPrintReceipt(receiptUrl);
+        if (typeof window.askPrintReceipt === 'function') {
+            console.log('Calling window.askPrintReceipt...');
+            window.askPrintReceipt(receiptUrl);
         } else {
+            console.log('window.askPrintReceipt not found, falling back to window.open');
             window.open(receiptUrl, '_blank', 'width=420,height=760');
         }
     }

@@ -197,38 +197,40 @@
             background-color: #fff;
         }
 
-        /* PRINT STYLES - Diperbarui agar tinggi dinamis */
+        /* PRINT STYLES - Diperbarui agar tinggi dinamis dan pas dengan kertas 80mm */
         @media print {
             @page {
                 margin: 0;
-                size: auto;
-                /* Biarkan pengaturan Roll Paper Windows yang bekerja */
+                size: 80mm auto;
             }
 
             html,
             body {
-                background: #fff;
-                padding: 0;
-                margin: 0;
-                width: 100%;
+                background: #fff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 80mm !important;
+                display: block !important;
                 height: auto !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
 
             .receipt-wrapper {
-                width: 100%;
-                /* Mengikuti lebar asli printable area (72.1mm) */
-                box-shadow: none;
-                margin: 0;
-                padding: 0;
+                width: 80mm !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
             }
 
             .thermal-receipt {
-                width: 100%;
-                padding: 2mm 5mm !important;
-                /* Memberikan jarak aman kiri-kanan */
+                width: 80mm !important;
+                padding: 2mm 4mm !important;
                 font-size: 12px;
                 box-sizing: border-box;
                 height: auto !important;
+                display: block !important;
             }
 
             .no-print {
@@ -311,11 +313,15 @@
         <div class="thermal-receipt">
             <!-- Header -->
             <div class="thermal-header">
-                <div class="thermal-store-name">TOKO INTAN</div>
+                <div class="thermal-store-name">TOKO KURNIA CABANG{{ $transaction->store?->name_store ? ' - ' . $transaction->store->name_store : '' }}</div>
                 <div class="thermal-store-info">
-                    Jl. Raya Sabar<br>
-                    Kota Blitar<br>
-                    031-012345
+                    @if($transaction->store?->address)
+                        {!! nl2br(e($transaction->store->address)) !!}<br>
+                    @else
+                        Jl. Raya Sabar<br>
+                        Kota Blitar<br>
+                    @endif
+                    {{ $transaction->store?->phone ?? '031-012345' }}
                 </div>
             </div>
 
@@ -387,7 +393,7 @@
                 <div class="thermal-thank-you">Terimakasih</div>
                 <div class="thermal-footer-text">Atas Pembelian Anda</div>
                 <div class="thermal-cashier">
-                    Powered by Toko Intan POS<br>
+                    Powered by TOKO KURNIA CABANG{{ $transaction->store?->name_store ? ' - ' . $transaction->store->name_store : '' }} POS<br>
                     {{ now()->format('Y') }}
                 </div>
             </div>
@@ -401,7 +407,7 @@
                 <span>💾</span>
                 Download PDF
             </button>
-            <button class="btn btn-print" onclick="window.print()">
+            <button class="btn btn-print" onclick="handlePrint()">
                 <span>🖨️</span>
                 Cetak
             </button>
@@ -416,11 +422,40 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
-        // Hide "Kembali ke Kasir" button if loaded inside an iframe (modal context)
+        // Hide all action buttons if loaded inside an iframe (modal context)
         if (window.self !== window.top) {
-            const backBtn = document.querySelector('.btn-back');
-            if (backBtn && backBtn.parentElement) {
-                backBtn.parentElement.style.display = 'none';
+            document.querySelectorAll('.button-group').forEach(group => {
+                group.style.display = 'none';
+            });
+
+            // Adjust styles for seamless iframe preview (no background and full width)
+            document.body.style.background = '#ffffff';
+            document.body.style.padding = '0';
+            
+            const wrapper = document.querySelector('.receipt-wrapper');
+            if (wrapper) {
+                wrapper.style.width = '100%';
+                wrapper.style.boxShadow = 'none';
+                wrapper.style.margin = '0';
+            }
+            
+            const thermal = document.querySelector('.thermal-receipt');
+            if (thermal) {
+                thermal.style.width = '100%';
+                thermal.style.padding = '10px 20px';
+            }
+        }
+
+        function handlePrint() {
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            if (isAndroid) {
+                const absoluteUrl = window.location.href;
+                const intentUrl = 'intent:' + encodeURI(absoluteUrl) + '#Intent;' +
+                                  'component=ru.a402d.rawbtprinter.activity.PrintDownloadActivity;' +
+                                  'package=ru.a402d.rawbtprinter;end;';
+                window.location.href = intentUrl;
+            } else {
+                window.print();
             }
         }
 
