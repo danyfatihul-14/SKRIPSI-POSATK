@@ -7,6 +7,25 @@
     let searchTimer = null;
     let receiptPrintUrl = '';
 
+    function getVariantDisplayName(p) {
+        const variantEmpty = !p.variant || p.variant === '-' || p.variant.toLowerCase() === 'default';
+        const unitEmpty = !p.unit || p.unit === '-' || p.unit.toLowerCase() === 'default';
+
+        if (variantEmpty && !unitEmpty) {
+            return p.unit;
+        }
+        if (!variantEmpty && unitEmpty) {
+            return p.variant;
+        }
+        if (!variantEmpty && !unitEmpty) {
+            if (p.variant.toLowerCase() === p.unit.toLowerCase()) {
+                return p.variant;
+            }
+            return `${p.variant} (${p.unit})`;
+        }
+        return 'Default';
+    }
+
     function getCartQty(productId) {
         const item = cart.find(i => i.id == productId);
         return item ? item.qty : 0;
@@ -95,8 +114,9 @@
         box.innerHTML = groupedList.map(group => {
             if (group.length === 1) {
                 const prod = group[0];
-                const displayName = prod.variant && prod.variant !== '-' 
-                    ? `${prod.product_name} (${prod.variant})` 
+                const vName = getVariantDisplayName(prod);
+                const displayName = vName !== 'Default' 
+                    ? `${prod.product_name} (${vName})` 
                     : prod.product_name;
                 
                 const availableStock = Math.max(0, (prod.stock ?? 0) - getCartQty(prod.product_id) - getHeldQty(prod.product_id));
@@ -128,7 +148,7 @@
                         </div>
 
                         <div style="font-size:12px; color:#2563eb; font-weight:600; margin-bottom:4px;">
-                            Varian: ${prod.variant && prod.variant !== '-' ? prod.variant : '-'}
+                            Varian: ${getVariantDisplayName(prod) !== 'Default' ? getVariantDisplayName(prod) : '-'}
                         </div>
 
                         <div style="font-size:12px; color:var(--accent); margin-bottom:6px;">
@@ -152,7 +172,7 @@
                     ? `Rp${minPrice.toLocaleString('id-ID')}` 
                     : `Rp${minPrice.toLocaleString('id-ID')} - Rp${maxPrice.toLocaleString('id-ID')}`;
                 
-                const variantNames = group.map(p => p.variant && p.variant !== '-' ? p.variant : 'Default').join(', ');
+                const variantNames = group.map(p => getVariantDisplayName(p)).join(', ');
                 const escapedName = firstProd.product_name.replace(/'/g, "\\'");
 
                 return `
@@ -385,6 +405,10 @@
             .then((data) => {
                 cart = [];
                 updateCartBadge();
+                if (typeof fetchProducts === 'function') {
+                    const searchInput = document.getElementById('productSearch');
+                    fetchProducts(searchInput ? searchInput.value : '');
+                }
                 showPage(redirectPage);
                 window.showAlert(data.message || 'Order berhasil dikirim.');
             })
@@ -535,7 +559,7 @@
             const borderStyle = isSelected ? 'border: 2px solid var(--accent); background: #f0f4ff;' : 'border: 1px solid #e2e8f0; background: #fff;';
             const badgeStyle = isSelected ? 'display: flex;' : 'display: none;';
             const price = parseFloat(v.selling_price).toLocaleString('id-ID');
-            const variantName = v.variant && v.variant !== '-' ? v.variant : 'Default';
+            const variantName = getVariantDisplayName(v);
             const availableStock = Math.max(0, (v.stock ?? 0) - getCartQty(v.product_id) - getHeldQty(v.product_id));
             const isOutOfStock = availableStock <= 0;
             const cardOpacity = isOutOfStock ? 'opacity: 0.55;' : '';
@@ -621,8 +645,9 @@
             return;
         }
 
-        const displayName = activeVar.variant && activeVar.variant !== '-' 
-            ? `${activeVar.product_name} (${activeVar.variant})` 
+        const vName = getVariantDisplayName(activeVar);
+        const displayName = vName !== 'Default' 
+            ? `${activeVar.product_name} (${vName})` 
             : activeVar.product_name;
 
         addCartWithQty(activeVar.product_id, displayName, activeVar.selling_price, qty, activeVar.stock ?? 0);

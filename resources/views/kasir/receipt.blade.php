@@ -197,11 +197,11 @@
             background-color: #fff;
         }
 
-        /* PRINT STYLES - Diperbarui agar tinggi dinamis dan pas dengan kertas 80mm */
+        /* PRINT STYLES - Menggunakan 100% lebar agar pas dengan spooler tanpa mengecilkan teks */
         @media print {
             @page {
                 margin: 0;
-                size: 80mm auto;
+                size: auto;
             }
 
             html,
@@ -209,7 +209,8 @@
                 background: #fff !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                width: 80mm !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 display: block !important;
                 height: auto !important;
                 -webkit-print-color-adjust: exact;
@@ -217,20 +218,83 @@
             }
 
             .receipt-wrapper {
-                width: 80mm !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 box-shadow: none !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 display: block !important;
             }
 
+            /* Gunakan ukuran besar secara default cetak untuk mengimbangi bug scaling mobile Chrome */
             .thermal-receipt {
-                width: 80mm !important;
-                padding: 2mm 4mm !important;
-                font-size: 12px;
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 6mm 12mm !important;
                 box-sizing: border-box;
                 height: auto !important;
                 display: block !important;
+            }
+
+            .thermal-store-name {
+                font-weight: bold;
+                font-size: 38px !important;
+            }
+            .thermal-store-info {
+                font-size: 26px !important;
+            }
+            .thermal-code {
+                font-weight: bold;
+                font-size: 28px !important;
+            }
+            .thermal-datetime {
+                font-size: 26px !important;
+            }
+            .thermal-item {
+                font-size: 28px !important;
+                margin-bottom: 8px !important;
+            }
+            .thermal-item-detail {
+                font-size: 26px !important;
+            }
+            .thermal-item-price-right {
+                min-width: 180px !important;
+            }
+            .thermal-summary-row {
+                font-size: 28px !important;
+                margin-bottom: 6px !important;
+            }
+            .thermal-summary-row span:last-child {
+                min-width: 210px !important;
+            }
+            .thermal-total {
+                font-size: 34px !important;
+                border-top: 3.5px solid #000 !important;
+                border-bottom: 3.5px solid #000 !important;
+                padding: 12px 0 !important;
+                margin: 18px 0 !important;
+            }
+            .thermal-total span:last-child {
+                min-width: 210px !important;
+            }
+            .thermal-footer {
+                font-size: 26px !important;
+                border-top: 3px dashed #000 !important;
+                padding-top: 24px !important;
+                margin-top: 24px !important;
+            }
+            .thermal-cashier {
+                font-size: 24px !important;
+                margin-top: 18px !important;
+            }
+            .thermal-divider {
+                border-bottom: 3px dashed #000 !important;
+                margin: 18px 0 !important;
+            }
+            .thermal-header {
+                border-bottom: 3px dashed #000 !important;
+                padding-bottom: 18px !important;
+                margin-bottom: 24px !important;
             }
 
             .no-print {
@@ -238,7 +302,78 @@
             }
 
             .thermal-jagged {
-                display: none;
+                display: none !important;
+            }
+        }
+
+        /* Jika viewport cetak sempit (seperti di laptop/desktop yang memproses lebar kertas secara akurat < 600px),
+           kembalikan ukuran font dan garis ke ukuran normal agar tidak terlalu besar di kertas */
+        @media print and (max-width: 599px) {
+            .thermal-receipt {
+                padding: 2mm 4mm !important;
+            }
+            .thermal-store-name {
+                font-weight: bold;
+                font-size: 16px !important;
+            }
+            .thermal-store-info {
+                font-size: 12px !important;
+            }
+            .thermal-code {
+                font-weight: bold;
+                font-size: 13px !important;
+            }
+            .thermal-datetime {
+                font-size: 12px !important;
+            }
+            .thermal-item {
+                font-size: 13px !important;
+                margin-bottom: 3px !important;
+            }
+            .thermal-item-detail {
+                font-size: 12px !important;
+            }
+            .thermal-item-price-right {
+                min-width: 60px !important;
+            }
+            .thermal-summary-row {
+                font-size: 13px !important;
+                margin-bottom: 2px !important;
+            }
+            .thermal-summary-row span:first-child {
+                flex: 1;
+            }
+            .thermal-summary-row span:last-child {
+                min-width: 70px !important;
+            }
+            .thermal-total {
+                font-size: 15px !important;
+                border-top: 1px solid #000 !important;
+                border-bottom: 1px solid #000 !important;
+                padding: 4px 0 !important;
+                margin: 6px 0 !important;
+            }
+            .thermal-total span:last-child {
+                min-width: 70px !important;
+            }
+            .thermal-footer {
+                font-size: 12px !important;
+                border-top: 1px dashed #000 !important;
+                padding-top: 8px !important;
+                margin-top: 10px !important;
+            }
+            .thermal-cashier {
+                font-size: 11px !important;
+                margin-top: 8px !important;
+            }
+            .thermal-divider {
+                border-bottom: 1px dashed #000 !important;
+                margin: 6px 0 !important;
+            }
+            .thermal-header {
+                border-bottom: 1px dashed #000 !important;
+                padding-bottom: 6px !important;
+                margin-bottom: 8px !important;
             }
         }
 
@@ -434,29 +569,18 @@
             
             const wrapper = document.querySelector('.receipt-wrapper');
             if (wrapper) {
-                wrapper.style.width = '100%';
                 wrapper.style.boxShadow = 'none';
-                wrapper.style.margin = '0';
+                wrapper.style.margin = '0 auto';
             }
             
             const thermal = document.querySelector('.thermal-receipt');
             if (thermal) {
-                thermal.style.width = '100%';
-                thermal.style.padding = '10px 20px';
+                thermal.style.padding = '5px 6px';
             }
         }
 
         function handlePrint() {
-            const isAndroid = /Android/i.test(navigator.userAgent);
-            if (isAndroid) {
-                const absoluteUrl = window.location.href;
-                const intentUrl = 'intent:' + encodeURI(absoluteUrl) + '#Intent;' +
-                                  'component=ru.a402d.rawbtprinter.activity.PrintDownloadActivity;' +
-                                  'package=ru.a402d.rawbtprinter;end;';
-                window.location.href = intentUrl;
-            } else {
-                window.print();
-            }
+            window.print();
         }
 
         function handleBackToCashier(event) {

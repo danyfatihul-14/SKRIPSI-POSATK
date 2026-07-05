@@ -54,8 +54,5 @@ class User extends Authenticatable implements FilamentUser
         };
     }
 
-    public function getAuthIdentifierName()
-    {
-        return 'username';
-    }
+
 }

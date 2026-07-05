@@ -334,8 +334,13 @@ class SalesReportDashboard extends Page
         $unitSelect = $unitCol ? ", p.$unitCol as unit" : ", 'pcs' as unit";
         $unitGroupBy = $unitCol ? ", p.$unitCol" : "";
 
+        $groupBy = ["p.$prodPk", "p.$prodName"];
+        if ($unitCol) {
+            $groupBy[] = "p.$unitCol";
+        }
+
         return $query
-            ->groupBy("p.$prodPk", "p.$prodName")
+            ->groupBy($groupBy)
             ->selectRaw("
                 '$periode' as periode,
                 p.$prodName as product_name,

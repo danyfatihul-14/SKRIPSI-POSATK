@@ -774,18 +774,17 @@
             if (msgEl) msgEl.textContent = 'Pratinjau struk Anda di bawah ini.';
             
             if (iframeContainer) iframeContainer.style.display = 'block';
-            if (iframe) iframe.src = receiptUrl;
+            if (iframe) {
+                // Tambahkan parameter timestamp untuk memintas cache browser di tablet Android
+                const cacheBuster = (receiptUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + new Date().getTime();
+                iframe.src = receiptUrl + cacheBuster;
+            }
             
             if (printBtn) {
                 printBtn.style.display = 'block';
                 printBtn.onclick = function() {
-                    const isAndroid = /Android/i.test(navigator.userAgent);
-                    if (isAndroid) {
-                        const absoluteUrl = new URL(receiptUrl, window.location.href).href;
-                        const intentUrl = 'intent:' + encodeURI(absoluteUrl) + '#Intent;' +
-                                          'component=ru.a402d.rawbtprinter.activity.PrintDownloadActivity;' +
-                                          'package=ru.a402d.rawbtprinter;end;';
-                        window.location.href = intentUrl;
+                    if (iframe.contentWindow && typeof iframe.contentWindow.handlePrint === 'function') {
+                        iframe.contentWindow.handlePrint();
                     } else {
                         if (iframe.contentWindow) {
                             iframe.contentWindow.focus();

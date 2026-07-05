@@ -44,6 +44,9 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                         <div>
                             <div style="font-weight:700; color:#0f172a;">${row.transaction_code}</div>
+                            <div style="font-size:12px; color:#475569; margin-top:4px; font-weight:600;">
+                                Pembeli: <span style="color:#0f172a;">${row.customer_name}</span>
+                            </div>
                             <div style="font-size:12px; color:#64748b; margin-top:2px;">
                                 Pelayan: ${row.served_by} | ${row.created_at}
                             </div>
@@ -109,6 +112,10 @@
                         }
                         window.showAlert(data.message || 'Transaksi berhasil dihapus.', 'success');
                         renderPendingList();
+                        if (typeof fetchProducts === 'function') {
+                            const searchInput = document.getElementById('productSearch');
+                            fetchProducts(searchInput ? searchInput.value : '');
+                        }
                     })
                     .catch((e) => window.showAlert(e.message, 'error'));
             });

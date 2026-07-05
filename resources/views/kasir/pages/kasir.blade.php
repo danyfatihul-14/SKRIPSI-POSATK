@@ -534,8 +534,15 @@
                 </div>
                 <div>
                     <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Satuan</label>
-                    <input type="text" id="addProductUnit" placeholder="Contoh: biji, pack" 
-                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none;" />
+                    <select id="addProductUnit" 
+                        style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; background:white; cursor:pointer;">
+                        <option value="biji">biji</option>
+                        <option value="lusin">lusin</option>
+                        <option value="pack">pack</option>
+                        <option value="box">box</option>
+                        <option value="lembar">lembar</option>
+                        <option value="buah">buah</option>
+                    </select>
                 </div>
             </div>
 

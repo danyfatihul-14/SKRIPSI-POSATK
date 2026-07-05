@@ -808,9 +808,10 @@ class KasirController extends Controller
                 'file_url'      => $fileUrl,
             ]);
 
-            StockLevel::create([
+            StockLevel::updateOrCreate([
                 'store_id'   => $storeId,
                 'product_id' => $product->product_id,
+            ], [
                 'quantity'   => $request->input('initial_stock') ?? 0,
                 'unit_price' => $request->input('selling_price'),
                 'discount'   => 0,

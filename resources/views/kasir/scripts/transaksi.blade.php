@@ -265,6 +265,10 @@
             if (paymentEl) paymentEl.value = "";
             renderOrderSummary();
             if (typeof renderPendingList === "function") renderPendingList();
+            if (typeof fetchProducts === "function") {
+                const searchInput = document.getElementById('productSearch');
+                fetchProducts(searchInput ? searchInput.value : '');
+            }
         });
         setWaitingPaymentBadge(pendingList.length);
     }
@@ -495,6 +499,10 @@
         renderOrderSummary();
         if (typeof renderCart === "function") renderCart();
         if (typeof renderPendingList === "function") renderPendingList();
+        if (typeof fetchProducts === "function") {
+            const searchInput = document.getElementById('productSearch');
+            fetchProducts(searchInput ? searchInput.value : '');
+        }
         if (typeof showPage === "function") showPage("kasir");
 
         window.showAlert(data.message || "Transaksi berhasil.");

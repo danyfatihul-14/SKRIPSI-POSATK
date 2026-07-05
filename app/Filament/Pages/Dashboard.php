@@ -69,15 +69,15 @@ class Dashboard extends Page
         $lowStock = 0;
         $activeStores = 1;
 
-        if (Schema::hasTable('stock_level')) {
-            $lowStock = DB::table('stock_level')
+        if (Schema::hasTable('stock_levels')) {
+            $lowStock = DB::table('stock_levels')
                 ->select('product_id')
                 ->groupBy('product_id')
                 ->havingRaw('SUM(quantity) < 10')
                 ->get()
                 ->count();
 
-            $activeStores = DB::table('stock_level')
+            $activeStores = DB::table('stock_levels')
                 ->distinct()
                 ->count('store_id');
         }
@@ -217,8 +217,8 @@ class Dashboard extends Page
         }
 
         // FIX: ambil stok kritis dari stock_level, bukan products.stock
-        if (Schema::hasTable('stock_level') && Schema::hasTable('products')) {
-            $lowStocks = DB::table('stock_level as s')
+        if (Schema::hasTable('stock_levels') && Schema::hasTable('products')) {
+            $lowStocks = DB::table('stock_levels as s')
                 ->join('products as p', 'p.product_id', '=', 's.product_id')
                 ->selectRaw('p.product_name, SUM(s.quantity) as qty_total')
                 ->groupBy('p.product_id', 'p.product_name')

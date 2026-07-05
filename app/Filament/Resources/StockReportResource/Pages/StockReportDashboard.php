@@ -21,6 +21,7 @@ class StockReportDashboard extends Page
     public ?int $storeId = null;
     public array $stores = [];
     public int $perPage = 15;
+    public int $lowStockPerPage = 10;
 
     public function mount(): void
     {
@@ -36,12 +37,18 @@ class StockReportDashboard extends Page
     public function updatedStoreId(): void
     {
         $this->resetPage();
+        $this->resetPage('lowStockPage');
+    }
+
+    public function updatedLowStockPerPage(): void
+    {
+        $this->resetPage('lowStockPage');
     }
 
     public function getLowStockProducts()
     {
         if (!\Illuminate\Support\Facades\Schema::hasTable('stock_levels')) {
-            return [];
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $this->lowStockPerPage);
         }
 
         $query = StockLevel::query()
@@ -52,7 +59,7 @@ class StockReportDashboard extends Page
             $query->where('store_id', $this->storeId);
         }
 
-        return $query->orderBy('quantity', 'asc')->get();
+        return $query->orderBy('quantity', 'asc')->paginate($this->lowStockPerPage, ['*'], 'lowStockPage');
     }
 
     public function getStockLogs()

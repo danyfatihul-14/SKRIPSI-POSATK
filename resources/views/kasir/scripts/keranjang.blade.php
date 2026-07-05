@@ -130,6 +130,10 @@
                 if (data.message) {
                     cart = [];
                     updateCartBadge();
+                    if (typeof fetchProducts === 'function') {
+                        const searchInput = document.getElementById('productSearch');
+                        fetchProducts(searchInput ? searchInput.value : '');
+                    }
                     showPage(redirectPage);
                     if (redirectPage === 'pending' && typeof renderPendingList === 'function') {
                         setTimeout(() => renderPendingList(), 300);

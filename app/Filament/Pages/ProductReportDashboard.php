@@ -138,7 +138,7 @@ class ProductReportDashboard extends Page
 
             $rows = $query
                 ->selectRaw("'Semua' as periode, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect")
-                ->groupBy('p.product_id', 'p.product_name')
+                ->groupBy($hasUnit ? ['p.product_id', 'p.product_name', 'p.unit'] : ['p.product_id', 'p.product_name'])
                 ->orderByDesc('qty')
                 ->limit($this->perPage)
                 ->get();
@@ -169,7 +169,7 @@ class ProductReportDashboard extends Page
 
         $rows = $query
             ->selectRaw("? as periode, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect", [$label])
-            ->groupBy('p.product_id', 'p.product_name')
+            ->groupBy($hasUnit ? ['p.product_id', 'p.product_name', 'p.unit'] : ['p.product_id', 'p.product_name'])
             ->orderByDesc('qty')
             ->limit($this->perPage)
             ->get();
