@@ -57,7 +57,7 @@
                     <td style="text-align: center;">
                         <button type="button" class="btn-primary" style="padding: 8px 14px; font-size: 14px; border: none; border-radius: 6px;"
                             onclick="openStockAdjustModal('${prod.product_id}', '${escapedName}', ${prod.stock ?? 0})">
-                            Update
+                            Barang Masuk
                         </button>
                     </td>
                 </tr>
@@ -90,7 +90,7 @@
         if (nameEl) nameEl.innerText = productName;
         if (currentQtyEl) currentQtyEl.innerText = currentQty;
         if (newQtyInput) {
-            newQtyInput.value = currentQty;
+            newQtyInput.value = 0;
             newQtyInput.focus();
         }
 
@@ -108,12 +108,15 @@
         if (!activeAdjustProductId) return;
 
         const newQtyInput = document.getElementById('adjustModalNewQty');
-        const quantity = parseInt(newQtyInput.value);
+        const incomingQty = parseInt(newQtyInput.value);
 
-        if (isNaN(quantity) || quantity < 0) {
-            window.showAlert('Jumlah stok baru harus berupa angka positif!', 'warning');
+        if (isNaN(incomingQty) || incomingQty < 0) {
+            window.showAlert('Jumlah barang masuk harus berupa angka positif!', 'warning');
             return;
         }
+
+        const currentQty = parseInt(document.getElementById('adjustModalCurrentQty').innerText) || 0;
+        const quantity = currentQty + incomingQty;
 
         const params = new URLSearchParams();
         params.append('product_id', activeAdjustProductId);

@@ -244,11 +244,11 @@
 <div id="page-stok" class="page h-full flex flex-col" style="background: var(--light);">
     <div class="stok-layout">
         <div class="stok-header">
-            <h2 style="font-weight: 700; color: var(--dark); font-size: 22px; margin: 0;">Pengelolaan Stok</h2>
+            <h2 style="font-weight: 700; color: var(--dark); font-size: 22px; margin: 0;">Pencatatan Barang Masuk</h2>
         </div>
 
         <div class="stok-tabs">
-            <button class="stok-tab-btn active" onclick="switchStokTab('adjust')">Penyesuaian Stok</button>
+            <button class="stok-tab-btn active" onclick="switchStokTab('adjust')">Pencatatan Barang Masuk</button>
             <button class="stok-tab-btn" onclick="switchStokTab('convert')">Konversi Satuan (Lusin -> Biji)</button>
         </div>
 
@@ -258,7 +258,7 @@
                 <input
                     id="stockSearchInput"
                     type="text"
-                    placeholder="Cari produk untuk disesuaikan..."
+                    placeholder="Cari produk..."
                     class="form-control"
                     style="max-width: 320px;" />
             </div>
@@ -330,7 +330,7 @@
     <div class="stok-modal__backdrop" onclick="closeStockAdjustModal()"></div>
     <div class="stok-modal__dialog">
         <div class="stok-modal__header">
-            <h5 id="stockAdjustModalTitle" class="stok-modal__title">Update Stok</h5>
+            <h5 id="stockAdjustModalTitle" class="stok-modal__title">Pencatatan Barang Masuk</h5>
             <button type="button" class="stok-modal__close" onclick="closeStockAdjustModal()">×</button>
         </div>
         
@@ -344,13 +344,13 @@
         </div>
 
         <div class="form-group" style="margin-top: 8px;">
-            <label for="adjustModalNewQty">Masukkan Jumlah Stok Baru</label>
-            <input type="number" id="adjustModalNewQty" class="form-control" min="0" placeholder="Masukkan jumlah stok baru..." required />
+            <label for="adjustModalNewQty">Masukkan Jumlah Barang Masuk</label>
+            <input type="number" id="adjustModalNewQty" class="form-control" min="0" placeholder="Masukkan jumlah barang masuk..." required />
         </div>
 
         <div class="stok-modal__footer">
             <button type="button" class="btn-secondary" onclick="closeStockAdjustModal()" style="border: 1px solid #cbd5e1; background: #fff;">Batal</button>
-            <button type="button" class="btn-primary" onclick="saveStockAdjustment()" style="border: none;">Simpan Perubahan</button>
+            <button type="button" class="btn-primary" onclick="saveStockAdjustment()" style="border: none;">Simpan Barang Masuk</button>
         </div>
     </div>
 </div>

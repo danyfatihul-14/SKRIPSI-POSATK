@@ -33,6 +33,8 @@ class XgboostPrediction extends Page
         'raw_predicted_units' => 0,
         'recommended_units' => 0,
     ];
+    public ?array $selectedHistoryDetails = null;
+    public ?string $selectedHistoryTitle = '';
 
     public function mount(): void
     {
@@ -241,6 +243,7 @@ class XgboostPrediction extends Page
                 $first = $group->first();
 
                 return [
+                    'store_id' => $first->store_id,
                     'date' => optional($first->prediction_date)->format('Y-m-d') ?? '-',
                     'store' => $first->store?->name_store ?? '-',
                     'product_count' => $group->count(),
@@ -376,5 +379,45 @@ class XgboostPrediction extends Page
             ->body('URL: ' . ($status['api_url'] ?? '-') . ' | Timeout: ' . ($status['timeout'] ?? '-') . 's')
             ->color(($status['healthy'] ?? false) ? 'success' : 'danger')
             ->send();
+    }
+
+    public function showHistoryDetails(int $storeId, string $date, ?string $startDate, ?string $endDate): void
+    {
+        $query = MlPrediction::query()
+            ->with('product')
+            ->where('store_id', $storeId)
+            ->whereDate('prediction_date', $date);
+
+        if (!empty($startDate) && $startDate !== '-') {
+            $query->whereDate('start_date', $startDate);
+        } else {
+            $query->whereNull('start_date');
+        }
+
+        if (!empty($endDate) && $endDate !== '-') {
+            $query->whereDate('end_date', $endDate);
+        } else {
+            $query->whereNull('end_date');
+        }
+
+        $predictions = $query->get();
+
+        $this->selectedHistoryDetails = $predictions->map(function ($row) {
+            return [
+                'product_name' => $row->product?->product_name ?? '-',
+                'qty' => (int) $row->predicted_quantity,
+                'unit' => $row->product?->unit ?? 'pcs',
+                'estimated_cost' => (float) $row->predicted_revenue,
+            ];
+        })->all();
+
+        $storeName = \App\Models\Store::find($storeId)?->name_store ?? '-';
+        $this->selectedHistoryTitle = "Detail Prediksi - Toko: {$storeName} | Tanggal Eksekusi: {$date}";
+    }
+
+    public function closeHistoryDetails(): void
+    {
+        $this->selectedHistoryDetails = null;
+        $this->selectedHistoryTitle = '';
     }
 }

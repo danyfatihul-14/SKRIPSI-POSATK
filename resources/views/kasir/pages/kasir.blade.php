@@ -406,6 +406,11 @@
                             </svg>
                             Tambah Produk
                         </button>
+                        <button type="button" onclick="openQrScanModal()" style="border: 1px solid var(--accent); background: white; color: var(--accent); border-radius: 8px; padding: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; transition: opacity .15s; margin-right: 2px;" title="Scan QR Code / Barcode">
+                            <svg xmlns="http://www.w3.org/2000/svg" style="width: 18px; height: 18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9h6V3H3v6zm0 12h6v-6H3v6zm12-12h6V3h-6v6zm3 10a1 1 0 100-2 1 1 0 000 2zm-3-1a1 1 0 11-2 0 1 1 0 012 0zm3 3a1 1 0 11-2 0 1 1 0 012 0zm-3 1a1 1 0 11-2 0 1 1 0 012 0z" />
+                            </svg>
+                        </button>
                         <input
                             id="productSearch"
                             type="text"
@@ -610,5 +615,26 @@
                 <button type="submit" class="btn-primary" style="flex: 1;">Simpan Produk</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Modal Scanner QR Code / Barcode -->
+<div id="qrScanModal" class="receipt-modal hidden" style="z-index: 10000;">
+    <div class="receipt-modal__backdrop" onclick="closeQrScanModal()"></div>
+    <div class="receipt-modal__dialog" style="width: min(92vw, 480px); background: #fff; border-radius: 16px; padding: 20px; z-index: 10001; position: relative;">
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">
+            <h5 style="font-size: 16px; font-weight: 700; color: var(--dark); margin: 0;">Scan QR Code / Barcode Barang</h5>
+            <button type="button" onclick="closeQrScanModal()" style="border: none; background: transparent; font-size: 20px; cursor: pointer; color: #94a3b8; line-height: 1;">×</button>
+        </div>
+        
+        <div id="reader" style="width: 100%; max-width: 440px; margin: 0 auto; background: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;"></div>
+        
+        <div style="margin-top: 16px; text-align: center; font-size: 13px; color: #64748b;">
+            Arahkan kamera ke QR Code atau Barcode pada label barang.
+        </div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button type="button" onclick="closeQrScanModal()" style="flex: 1; border: 1px solid #cbd5e1; background: #fff; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer;">Tutup</button>
+        </div>
     </div>
 </div>

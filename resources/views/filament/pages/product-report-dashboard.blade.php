@@ -179,15 +179,17 @@
                         </x-filament::input.wrapper>
                     </div>
 
-                    {{-- Periode filter --}}
-                    <div class="w-44">
+                    {{-- Start Date Filter --}}
+                    <div class="w-40">
                         <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model.live="periodeFilter" style="font-weight:600;color:#1e293b;">
-                                <option value="harian">📅 Harian</option>
-                                <option value="mingguan">📆 Mingguan</option>
-                                <option value="bulanan">🗓️ Bulanan</option>
-                                <option value="semua">🔁 Semua Periode</option>
-                            </x-filament::input.select>
+                            <x-filament::input type="date" wire:model.live="startDate" style="font-weight: 600; color: #1e293b;" />
+                        </x-filament::input.wrapper>
+                    </div>
+
+                    {{-- End Date Filter --}}
+                    <div class="w-40">
+                        <x-filament::input.wrapper>
+                            <x-filament::input type="date" wire:model.live="endDate" style="font-weight: 600; color: #1e293b;" />
                         </x-filament::input.wrapper>
                     </div>
 
@@ -247,8 +249,8 @@
                         </svg>
                     </div>
                     <div class="stat-label">Filter Periode Aktif</div>
-                    <div class="stat-value text-rose-600">
-                        {{ ucfirst($periodeFilter === 'semua' ? 'Semua Periode' : $periodeFilter) }}
+                    <div class="stat-value text-rose-600" style="font-size: 13px; font-weight: 700; word-break: keep-all;">
+                        {{ \Carbon\Carbon::parse($startDate)->format('d/m/y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d/m/y') }}
                     </div>
                     <div class="stat-subtitle">
                         Toko: {{ $storeId ? ($stores[$storeId] ?? '—') : 'Semua Toko' }}
@@ -296,24 +298,19 @@
                     <table class="w-full table-auto text-sm">
                         <thead class="bg-gray-50 border-b sticky-header">
                             <tr>
-                                <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide w-32">Periode</th>
+                                <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide w-28">Periode</th>
                                 <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Nama Produk</th>
                                 <th class="px-6 py-3.5 text-right font-bold text-gray-600 text-xs uppercase tracking-wide w-36">Kuantitas Terjual</th>
                                 <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide w-48">Visualisasi</th>
                                 <th class="px-6 py-3.5 text-right font-bold text-gray-600 text-xs uppercase tracking-wide">Omzet Kotor</th>
+                                <th class="px-6 py-3.5 text-center font-bold text-gray-600 text-xs uppercase tracking-wide w-20 no-print">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @forelse($topRows as $row)
                                 @php
                                     $percentage = ($row['qty'] / $maxQty) * 100;
-                                    $periodKey  = strtolower($row['periode']);
-                                    $badgeClass = match($periodKey) {
-                                        'harian'   => 'badge-period-harian',
-                                        'mingguan' => 'badge-period-mingguan',
-                                        'semua'    => 'badge-period-semua',
-                                        default    => 'badge-period-bulanan',
-                                    };
+                                    $badgeClass = 'badge-period-bulanan';
                                 @endphp
                                 <tr class="hover:bg-emerald-50/40 transition-colors">
                                     <td class="px-6 py-4">
@@ -332,10 +329,17 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-right font-extrabold text-emerald-600 text-sm">Rp {{ number_format($row['omzet'], 0, ',', '.') }}</td>
+                                    <td class="px-6 py-4 text-center no-print">
+                                        <button
+                                            wire:click="showProductSalesDetail({{ $row['product_id'] }})"
+                                            class="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition-all border border-blue-200">
+                                            Detail
+                                        </button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-6 py-12 text-center text-gray-400">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-400">
                                         <div class="flex flex-col items-center gap-2">
                                             <span class="text-3xl">📭</span>
                                             <span class="font-medium">Belum ada data transaksi produk terekam</span>
@@ -418,4 +422,66 @@
             document.addEventListener('product-data-updated', renderChart);
         })();
     </script>
+
+    {{-- Product Sales Detail Modal --}}
+    @if($selectedProductDetails !== null)
+    <div class="modal-backdrop no-print" wire:click.self="closeProductSalesDetail" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 24px;">
+        <div class="modal-box" style="background: white; border-radius: 20px; box-shadow: 0 25px 60px -10px rgba(0,0,0,0.25), 0 10px 25px -5px rgba(0,0,0,0.1); width: 100%; max-width: 680px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;">
+            <div class="modal-header" style="padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: flex-start; background: #f8fafc; border-radius: 20px 20px 0 0; flex-shrink: 0;">
+                <div>
+                    <div class="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-1" style="color: #3b82f6; font-weight: 700;">📦 Detail Penjualan Produk</div>
+                    <div class="font-extrabold text-lg text-gray-900" style="font-size: 1.125rem; font-weight: 800; color: #0f172a;">{{ $selectedProductName }}</div>
+                    <div class="text-xs text-gray-400 mt-1" style="color: #94a3b8;">
+                        Rentang: {{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} s/d {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}
+                    </div>
+                </div>
+                <button
+                    wire:click="closeProductSalesDetail"
+                    class="btn-close-modal ml-4 flex-shrink-0" style="display: inline-flex; align-items: center; gap: 6px; background: #fee2e2; color: #dc2626; border: none; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:14px;height:14px;"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    Tutup
+                </button>
+            </div>
+
+            <div class="modal-body max-h-[350px]" style="overflow-y: auto; flex: 1;">
+                <table class="w-full table-auto text-sm">
+                    <thead class="bg-gray-50 border-b sticky-header" style="position: sticky; top: 0; background: #f8fafc; z-index: 10; box-shadow: inset 0 -1px 0 #e2e8f0;">
+                        <tr>
+                            <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide" style="padding: 14px 24px; font-weight: 700; color: #4b5563;">Struk</th>
+                            <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide" style="padding: 14px 24px; font-weight: 700; color: #4b5563;">Tanggal</th>
+                            <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide" style="padding: 14px 24px; font-weight: 700; color: #4b5563;">Toko</th>
+                            <th class="px-6 py-3.5 text-right font-bold text-gray-600 text-xs uppercase tracking-wide" style="padding: 14px 24px; font-weight: 700; color: #4b5563;">Jumlah</th>
+                            <th class="px-6 py-3.5 text-right font-bold text-gray-600 text-xs uppercase tracking-wide" style="padding: 14px 24px; font-weight: 700; color: #4b5563;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @forelse($selectedProductDetails as $det)
+                        <tr class="hover:bg-blue-50/30 transition-colors">
+                            <td class="px-6 py-4 font-semibold text-blue-600" style="padding: 16px 24px; font-weight: 600; color: #2563eb;">{{ $det['code'] }}</td>
+                            <td class="px-6 py-4 text-gray-500" style="padding: 16px 24px; color: #6b7280;">{{ $det['time'] }}</td>
+                            <td class="px-6 py-4 text-gray-700 font-medium" style="padding: 16px 24px; color: #374151;">{{ $det['store_name'] }}</td>
+                            <td class="px-6 py-4 text-right font-bold text-gray-600" style="padding: 16px 24px; text-align: right; font-weight: 700; color: #4b5563;">{{ number_format($det['qty'], 0, ',', '.') }} pcs</td>
+                            <td class="px-6 py-4 text-right font-extrabold text-gray-900" style="padding: 16px 24px; text-align: right; font-weight: 800; color: #111827;">Rp {{ number_format($det['subtotal'], 0, ',', '.') }}</td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center text-gray-400" style="padding: 48px; text-align: center; color: #9ca3af;">
+                                Belum ada riwayat penjualan produk ini pada rentang waktu tersebut.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer" style="padding: 12px 24px; border-top: 1px solid #f1f5f9; background: #f8fafc; border-radius: 0 0 20px 20px; display: flex; justify-content: flex-end; flex-shrink: 0;">
+                <div class="text-sm font-bold text-gray-700" style="font-size: 0.875rem; font-weight: 700; color: #374151;">
+                    Total Terjual: <span class="text-blue-600 text-base font-extrabold ml-2" style="color: #2563eb; font-weight: 800; font-size: 1rem;">
+                        {{ number_format(array_sum(array_column($selectedProductDetails, 'qty')), 0, ',', '.') }} pcs
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 </x-filament-panels::page>

@@ -17,7 +17,8 @@ class ProductReportDashboard extends Page
     // Filters
     public ?int  $storeId       = null;
     public array $stores        = [];
-    public string $periodeFilter = 'bulanan'; // harian | mingguan | bulanan | semua
+    public ?string $startDate   = null;
+    public ?string $endDate     = null;
     public int   $perPage       = 10;
 
     // Data
@@ -28,6 +29,8 @@ class ProductReportDashboard extends Page
     public int    $totalQtySold      = 0;
     public string $topProductName    = '-';
     public int    $topProductCount   = 0;
+    public ?array $selectedProductDetails = null;
+    public ?string $selectedProductName = '';
 
     public function mount(): void
     {
@@ -38,11 +41,15 @@ class ProductReportDashboard extends Page
         $userStoreId = auth()->user()?->store_id;
         $this->storeId = $userStoreId ? (int) $userStoreId : null;
 
+        $this->startDate = now()->startOfMonth()->toDateString();
+        $this->endDate = now()->toDateString();
+
         $this->refreshData();
     }
 
     public function updatedStoreId(): void       { $this->refreshData(); }
-    public function updatedPeriodeFilter(): void  { $this->refreshData(); }
+    public function updatedStartDate(): void     { $this->refreshData(); }
+    public function updatedEndDate(): void       { $this->refreshData(); }
     public function updatedPerPage(): void        { $this->loadTopRows(); }
 
     public function refreshData(): void
@@ -53,19 +60,14 @@ class ProductReportDashboard extends Page
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    private function periodStart(): Carbon
-    {
-        return match ($this->periodeFilter) {
-            'harian'   => Carbon::today(),
-            'mingguan' => Carbon::now()->startOfWeek(),
-            default    => Carbon::now()->startOfMonth(), // bulanan + semua
-        };
-    }
-
     private function applyBaseFilters($query): mixed
     {
-        if ($this->periodeFilter !== 'semua') {
-            $query->where('t.created_at', '>=', $this->periodStart());
+        if ($this->startDate) {
+            $query->whereDate('t.created_at', '>=', $this->startDate);
+        }
+
+        if ($this->endDate) {
+            $query->whereDate('t.created_at', '<=', $this->endDate);
         }
 
         if ($this->storeId) {
@@ -127,39 +129,7 @@ class ProductReportDashboard extends Page
 
         $hasUnit = Schema::hasColumn('products', 'unit');
         $unitSelect = $hasUnit ? ', p.unit as unit' : ", 'pcs' as unit";
-
-        if ($this->periodeFilter === 'semua') {
-            // Single combined query — no grouping by period label
-            $query = DB::table('transaction_items as d')
-                ->join('transactions as t', 't.transaction_id', '=', 'd.transaction_id')
-                ->join('products as p', 'p.product_id', '=', 'd.product_id');
-
-            $this->applyBaseFilters($query);
-
-            $rows = $query
-                ->selectRaw("'Semua' as periode, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect")
-                ->groupBy($hasUnit ? ['p.product_id', 'p.product_name', 'p.unit'] : ['p.product_id', 'p.product_name'])
-                ->orderByDesc('qty')
-                ->limit($this->perPage)
-                ->get();
-
-            $this->topRows = $rows->map(fn($r) => [
-                'periode'      => 'Semua',
-                'product_name' => (string) $r->product_name,
-                'qty'          => (int)    $r->qty,
-                'omzet'        => (float)  $r->omzet,
-                'unit'         => $r->unit ?? 'pcs',
-            ])->toArray();
-
-            return;
-        }
-
-        // Single period selected
-        $label = match ($this->periodeFilter) {
-            'harian'   => 'Harian',
-            'mingguan' => 'Mingguan',
-            default    => 'Bulanan',
-        };
+        $prodPk = Schema::hasColumn('products', 'product_id') ? 'product_id' : 'id';
 
         $query = DB::table('transaction_items as d')
             ->join('transactions as t', 't.transaction_id', '=', 'd.transaction_id')
@@ -168,18 +138,71 @@ class ProductReportDashboard extends Page
         $this->applyBaseFilters($query);
 
         $rows = $query
-            ->selectRaw("? as periode, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect", [$label])
-            ->groupBy($hasUnit ? ['p.product_id', 'p.product_name', 'p.unit'] : ['p.product_id', 'p.product_name'])
+            ->selectRaw("p.$prodPk as product_id, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect")
+            ->groupBy($hasUnit ? ["p.$prodPk", 'p.product_name', 'p.unit'] : ["p.$prodPk", 'p.product_name'])
             ->orderByDesc('qty')
             ->limit($this->perPage)
             ->get();
 
         $this->topRows = $rows->map(fn($r) => [
-            'periode'      => (string) $r->periode,
+            'periode'      => 'Periode Terfilter',
+            'product_id'   => (int)    $r->product_id,
             'product_name' => (string) $r->product_name,
             'qty'          => (int)    $r->qty,
             'omzet'        => (float)  $r->omzet,
             'unit'         => $r->unit ?? 'pcs',
         ])->toArray();
+    }
+
+    public function showProductSalesDetail(int $productId): void
+    {
+        $product = \App\Models\Product::find($productId);
+        if (!$product) return;
+
+        $this->selectedProductName = $product->product_name;
+
+        $query = DB::table('transaction_items as d')
+            ->join('transactions as t', 't.transaction_id', '=', 'd.transaction_id')
+            ->join('stores as s', 's.store_id', '=', 't.store_id')
+            ->where('d.product_id', $productId);
+
+        if ($this->storeId) {
+            $query->where('t.store_id', $this->storeId);
+        }
+
+        if ($this->startDate) {
+            $query->whereDate('t.created_at', '>=', $this->startDate);
+        }
+        if ($this->endDate) {
+            $query->whereDate('t.created_at', '<=', $this->endDate);
+        }
+
+        $query->whereIn('t.status', ['paid', 'success', 'completed', 'selesai']);
+
+        $rows = $query->selectRaw("
+            t.transaction_code as code,
+            t.created_at as time,
+            s.name_store as store_name,
+            d.quantity as qty,
+            d.unit_price as price,
+            d.subtotal as subtotal
+        ")
+        ->orderByDesc('t.created_at')
+        ->get();
+
+        $this->selectedProductDetails = $rows->map(fn($r) => [
+            'code' => $r->code,
+            'time' => Carbon::parse($r->time)->format('d/m/Y H:i'),
+            'store_name' => $r->store_name,
+            'qty' => (int) $r->qty,
+            'price' => (float) $r->price,
+            'subtotal' => (float) $r->subtotal,
+        ])->toArray();
+    }
+
+    public function closeProductSalesDetail(): void
+    {
+        $this->selectedProductDetails = null;
+        $this->selectedProductName = '';
     }
 }

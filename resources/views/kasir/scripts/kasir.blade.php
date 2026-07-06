@@ -1,9 +1,48 @@
 <script>
+    window.printProductQr = function(productId, productName, variant) {
+        const qrUrl = 'https://bwipjs-api.metafloor.com/?bcid=code128&text=' + productId + '&scale=1.5&rotate=N&includetext&height=8';
+        const printWindow = window.open('', '_blank', 'width=450,height=400');
+        printWindow.document.write('<html><head><title>Cetak Barcode - ' + productName + '</title>' +
+            '<style>' +
+            'body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 0; margin: 0; background: white; display: flex; align-items: center; justify-content: center; height: 100vh; }' +
+            '.container { ' +
+            '  width: 50mm; ' +
+            '  height: 30mm; ' +
+            '  border: 1px dashed #8b5cf6; ' +
+            '  padding: 1.5mm; ' +
+            '  display: flex; ' +
+            '  flex-direction: column; ' +
+            '  align-items: center; ' +
+            '  justify-content: center; ' +
+            '  box-sizing: border-box; ' +
+            '  border-radius: 6px; ' +
+            '  background: white; ' +
+            '}' +
+            'h3 { margin: 2px 0 0 0; font-size: 8px; color: #1e1b4b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }' +
+            'p { margin: 0; font-size: 7px; color: #6b21a8; font-weight: 600; text-align: center; }' +
+            'img { width: 44mm; height: 15mm; object-fit: contain; }' +
+            '</style></' + 'head><body>' +
+            '<div class="container">' +
+            '<img src="' + qrUrl + '" alt="Barcode" />' +
+            '<h3>' + productName + '</h3>' +
+            '<p>Varian: ' + variant + '</p>' +
+            '</div>' +
+            '<' + 'script>' +
+            'window.onload = function() {' +
+            '  setTimeout(function() {' +
+            '    window.print();' +
+            '    window.close();' +
+            '  }, 600);' +
+            '};' +
+            '</' + 'script></' + 'body></html>');
+        printWindow.document.close();
+    };
+
     let cart = [];
     const currentUserId = "{{ auth()->user()->user_id ?? auth()->user()->id ?? 'guest' }}";
     const heldCartsKey = 'heldCarts_' + currentUserId;
     let heldCarts = JSON.parse(localStorage.getItem(heldCartsKey) || '[]');
-    let products = [];
+    var products = [];
     let searchTimer = null;
     let receiptPrintUrl = '';
 
@@ -155,8 +194,12 @@
                             Satuan: ${prod.unit}
                         </div>
 
-                        <div style="font-size:14px; font-weight:700; color:var(--accent);">
-                            Rp${parseInt(prod.selling_price).toLocaleString('id-ID')}
+                        <div style="font-size:14px; font-weight:700; color:var(--accent); display: flex; justify-content: space-between; align-items: center;">
+                            <span>Rp${parseInt(prod.selling_price).toLocaleString('id-ID')}</span>
+                            <button onclick="event.stopPropagation(); printProductQr('${prod.product_id}', '${prod.product_name.replace(/'/g,"\\'")}', '${(prod.variant || '-').replace(/'/g,"\\'")}')" style="background: #8b5cf6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 12px; height: 12px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
+                                QR
+                            </button>
                         </div>
                     </div>
                 </div>`;
@@ -573,6 +616,10 @@
                 <div style="font-size: 11px; color: ${isOutOfStock ? '#ef4444' : '#64748b'}; margin-top: 2px; font-weight: ${isOutOfStock ? '700' : 'normal'};">
                     Stok: ${availableStock} ${isOutOfStock ? '(Habis)' : ''}
                 </div>
+                <button type="button" onclick="event.stopPropagation(); printProductQr('${v.product_id}', '${v.product_name.replace(/'/g,"\\'")}', '${(v.variant || '-').replace(/'/g,"\\'")}')" style="position: absolute; bottom: 8px; right: 8px; background: #8b5cf6; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; z-index: 50;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 10px; height: 10px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
+                    QR
+                </button>
             </div>
             `;
         }).join('');
@@ -888,6 +935,258 @@
             window.showAlert(err.message, 'error');
         });
     }
+
+    let html5QrcodeScanner = null;
+
+    function openQrScanModal() {
+        const modal = document.getElementById('qrScanModal');
+        if (modal) modal.classList.remove('hidden');
+
+        if (typeof Html5Qrcode !== 'undefined') {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                (decodedText) => {
+                    closeQrScanModal();
+                    
+                    const cleanCode = decodedText.toLowerCase().trim();
+                    const matchedProd = products.find(p => 
+                        p.product_name.toLowerCase().trim() === cleanCode ||
+                        String(p.product_id) === cleanCode ||
+                        (p.variant && p.variant.toLowerCase().trim() === cleanCode)
+                    );
+                    
+                    if (matchedProd) {
+                        addCart(matchedProd.product_id, matchedProd.product_name, matchedProd.selling_price);
+                        window.showAlert(`Berhasil men-scan: ${matchedProd.product_name}`, 'success');
+                    } else {
+                        const searchInput = document.getElementById('productSearch');
+                        if (searchInput) {
+                            searchInput.value = decodedText;
+                            fetchProducts(decodedText);
+                        }
+                        window.showAlert(`Barang dengan kode "${decodedText}" tidak ditemukan.`, 'warning');
+                    }
+                },
+                (errorMessage) => {
+                    // Ignore constant scan failures
+                }
+            ).catch(err => {
+                console.error("Camera init error:", err);
+                window.showAlert("Tidak dapat mengakses kamera: " + err, "error");
+            });
+        } else {
+            window.showAlert("Library scanner gagal dimuat.", "error");
+        }
+    }
+
+    function closeQrScanModal() {
+        const modal = document.getElementById('qrScanModal');
+        if (modal) modal.classList.add('hidden');
+
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => {
+                html5QrcodeScanner = null;
+            }).catch(err => {
+                console.error("Failed to stop scanner:", err);
+            });
+        }
+    }
+
+    let selectedQrIds = new Set();
+
+    window.toggleQrCard = function(card, event) {
+        const cb = card.querySelector('.qr-item-checkbox');
+        if (!cb) return;
+        
+        if (event.target !== cb) {
+            cb.checked = !cb.checked;
+            window.toggleQrItem(cb.dataset.id, cb.checked);
+        } else {
+            window.toggleQrItem(cb.dataset.id, cb.checked);
+        }
+        
+        window.updateQrCardHighlight(card, cb.checked);
+    };
+
+    window.updateQrCardHighlight = function(card, isChecked) {
+        if (isChecked) {
+            card.style.borderColor = '#8b5cf6';
+            card.style.background = '#f5f3ff';
+        } else {
+            card.style.borderColor = '#e2e8f0';
+            card.style.background = 'white';
+        }
+    };
+
+    window.renderQrProducts = function(list) {
+        const container = document.getElementById('qrProductContainer');
+        if (!container) return;
+
+        if (!list || list.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #94a3b8; font-size: 13px;">Tidak ada produk ditemukan</div>';
+            return;
+        }
+
+        container.innerHTML = list.map(p => {
+            const variantName = getVariantDisplayName(p);
+            const isChecked = selectedQrIds.has(String(p.product_id));
+            const checkedAttr = isChecked ? 'checked' : '';
+            const safeName = p.product_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const safeVariant = variantName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const cardBorder = isChecked ? '#8b5cf6' : '#e2e8f0';
+            const cardBg = isChecked ? '#f5f3ff' : 'white';
+
+            return '<div onclick="toggleQrCard(this, event)" style="border: 1px solid ' + cardBorder + '; border-radius: 10px; padding: 12px; display: flex; align-items: center; gap: 12px; background: ' + cardBg + '; transition: all 0.2s; cursor: pointer; user-select: none;" class="qr-product-item" data-name="' + p.product_name.toLowerCase() + ' ' + variantName.toLowerCase() + '">' +
+                '<input type="checkbox" class="qr-item-checkbox" data-id="' + p.product_id + '" data-name="' + safeName + '" data-variant="' + safeVariant + '" ' + checkedAttr + ' style="width: 18px; height: 18px; accent-color: #8b5cf6; cursor: pointer; flex-shrink: 0;" />' +
+                '<div style="flex: 1; min-width: 0;">' +
+                    '<div style="font-weight: 700; font-size: 13px; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + p.product_name + '</div>' +
+                    '<div style="font-size: 11px; color: #4f46e5; font-weight: 600; margin-top: 2px;">Varian: ' + (variantName !== 'Default' ? variantName : '-') + '</div>' +
+                    '<div style="font-size: 11px; color: #64748b; margin-top: 1px;">Satuan: ' + p.unit + '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        updateSelectAllQrState();
+    };
+
+    window.toggleQrItem = function(id, isChecked) {
+        if (isChecked) {
+            selectedQrIds.add(String(id));
+        } else {
+            selectedQrIds.delete(String(id));
+        }
+        updateSelectAllQrState();
+    };
+
+    window.toggleSelectAllQr = function(el) {
+        const checkboxes = document.querySelectorAll('.qr-item-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = el.checked;
+            const id = cb.dataset.id;
+            if (el.checked) {
+                selectedQrIds.add(String(id));
+            } else {
+                selectedQrIds.delete(String(id));
+            }
+            const parent = cb.closest('.qr-product-item');
+            if (parent) {
+                window.updateQrCardHighlight(parent, el.checked);
+            }
+        });
+    };
+
+    function updateSelectAllQrState() {
+        const selectAll = document.getElementById('selectAllQr');
+        if (!selectAll) return;
+        const checkboxes = document.querySelectorAll('.qr-item-checkbox');
+        if (checkboxes.length === 0) {
+            selectAll.checked = false;
+            return;
+        }
+        const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        selectAll.checked = checkedCount === checkboxes.length;
+    }
+
+    window.filterQrProducts = function() {
+        const q = document.getElementById('qrSearchInput').value.toLowerCase().trim();
+        const items = document.querySelectorAll('.qr-product-item');
+        items.forEach(item => {
+            const name = item.dataset.name || '';
+            if (name.includes(q)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    };
+
+    window.printSelectedQrs = function() {
+        const selectedCheckboxes = Array.from(document.querySelectorAll('.qr-item-checkbox')).filter(cb => cb.checked);
+        if (selectedCheckboxes.length === 0) {
+            window.showAlert('Silakan pilih minimal satu produk!', 'warning');
+            return;
+        }
+
+        const sizeSelect = document.getElementById('labelSizeSelect');
+        const sizeVal = sizeSelect ? sizeSelect.value : '50';
+
+        let cardWidth = '50mm';
+        let cardHeight = '30mm';
+        let gridCols = 'repeat(auto-fill, 50mm)';
+        let imgWidth = '44mm';
+        let imgHeight = '15mm';
+        let scaleVal = '1.5';
+        let titleFontSize = '8px';
+        let varFontSize = '7px';
+        let barcodeHeight = '8';
+
+        if (sizeVal === '80') {
+            cardWidth = '80mm';
+            cardHeight = '40mm';
+            gridCols = 'repeat(auto-fill, 80mm)';
+            imgWidth = '72mm';
+            imgHeight = '24mm';
+            scaleVal = '2';
+            titleFontSize = '11px';
+            varFontSize = '9px';
+            barcodeHeight = '12';
+        }
+
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        
+        let gridHtml = '';
+        selectedCheckboxes.forEach(cb => {
+            const id = cb.dataset.id;
+            const name = cb.dataset.name;
+            const variant = cb.dataset.variant;
+            const qrUrl = 'https://bwipjs-api.metafloor.com/?bcid=code128&text=' + id + '&scale=' + scaleVal + '&rotate=N&includetext&height=' + barcodeHeight;
+
+            gridHtml += '<div class="qr-label-card">' +
+                '<img src="' + qrUrl + '" alt="Barcode" />' +
+                '<div class="prod-title">' + name + '</div>' +
+                '<div class="prod-var">Varian: ' + variant + '</div>' +
+                '</div>';
+        });
+
+        printWindow.document.write('<html><head><title>Cetak Barcode Masal</title>' +
+            '<style>' +
+            'body { font-family: system-ui, -apple-system, sans-serif; padding: 10px; margin: 0; background: white; }' +
+            '.grid-container { display: grid; grid-template-columns: ' + gridCols + '; gap: 5mm; }' +
+            '.qr-label-card { ' +
+            '  width: ' + cardWidth + '; ' +
+            '  height: ' + cardHeight + '; ' +
+            '  border: 1px dashed #8b5cf6; ' +
+            '  border-radius: 6px; ' +
+            '  padding: 1.5mm; ' +
+            '  display: flex; ' +
+            '  flex-direction: column; ' +
+            '  align-items: center; ' +
+            '  justify-content: center; ' +
+            '  box-sizing: border-box; ' +
+            '  background: white; ' +
+            '  page-break-inside: avoid; ' +
+            '}' +
+            'img { width: ' + imgWidth + '; height: ' + imgHeight + '; object-fit: contain; }' +
+            '.prod-title { font-weight: 700; font-size: ' + titleFontSize + '; color: #1e1b4b; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; text-align: center; }' +
+            '.prod-var { font-size: ' + varFontSize + '; color: #6b21a8; font-weight: 600; margin-top: 1px; text-align: center; }' +
+            '@media print { body { padding: 0; } .qr-label-card { border-color: #000; background: white; } }' +
+            '</style></' + 'head><body>' +
+            '<div class="grid-container">' + gridHtml + '</div>' +
+            '<' + 'script>' +
+            'window.onload = function() {' +
+            '  setTimeout(function() {' +
+            '    window.print();' +
+            '    window.close();' +
+            '  }, 1200);' +
+            '};' +
+            '</' + 'script></' + 'body></html>');
+        printWindow.document.close();
+    };
 
     fetchProducts('');
     setupProductSearch();

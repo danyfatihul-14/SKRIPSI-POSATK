@@ -152,8 +152,22 @@
                     </svg>
                 </div>
                 <div class="text-left">
-                    <div class="text-sm font-semibold text-white">Update Stok</div>
+                    <div class="text-sm font-semibold text-white">Barang Masuk</div>
                     <div class="nav-sub text-xs text-white/40">Kelola & konversi stok</div>
+                </div>
+            </button>
+
+            {{-- Cetak QR --}}
+            <button onclick="showPage('cetak-qr')" id="nav-cetak-qr"
+                class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/10 hover:text-white transition-all duration-200 group">
+                <div class="nav-icon w-9 h-9 rounded-lg bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-all duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" />
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <div class="text-sm font-semibold text-white">Cetak QR</div>
+                    <div class="nav-sub text-xs text-white/40">Cetak QR Masal</div>
                 </div>
             </button>
 
@@ -212,6 +226,7 @@
         @include('kasir.pages.kasir')
         @include('kasir.pages.keranjang')
         @include('kasir.pages.stok')
+        @include('kasir.pages.cetak-qr')
         @unless ($isWaiter)
         @include('kasir.scripts.pending')
         @include('kasir.pages.transaksi')
@@ -244,6 +259,8 @@
         </div>
     </div>
 </div>
+
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
 <script>
     window.askPrintReceipt = function(receiptUrl) {
@@ -341,6 +358,9 @@
             }
             if (page === 'history' && typeof loadTransactionHistory === 'function') {
                 loadTransactionHistory();
+            }
+            if (page === 'cetak-qr' && typeof renderQrProducts === 'function') {
+                renderQrProducts(products);
             }
         }
 

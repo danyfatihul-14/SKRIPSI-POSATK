@@ -660,7 +660,7 @@ class KasirController extends Controller
             ]
         );
 
-        // Record stock log for manual adjustment
+        // Record stock log for manual adjustment (incoming goods)
         \App\Models\StockLog::create([
             'store_id'        => $storeId,
             'product_id'      => $productId,
@@ -669,12 +669,12 @@ class KasirController extends Controller
             'old_quantity'    => $oldStock,
             'new_quantity'    => $quantity,
             'quantity_change' => $quantity - $oldStock,
-            'notes'           => 'Penyesuaian stok manual oleh ' . ($request->user()?->name ?? 'System'),
+            'notes'           => 'Pencatatan barang masuk oleh ' . ($request->user()?->name ?? 'System'),
         ]);
 
         return response()->json([
             'status'   => 'success',
-            'message'  => 'Stok ' . $product->product_name . ' berhasil diperbarui menjadi ' . $quantity,
+            'message'  => 'Pencatatan barang masuk ' . $product->product_name . ' berhasil. Stok sekarang: ' . $quantity,
             'quantity' => $stockLevel->quantity
         ]);
     }

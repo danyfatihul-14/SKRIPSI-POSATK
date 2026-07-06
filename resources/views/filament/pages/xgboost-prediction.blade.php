@@ -98,28 +98,76 @@
                             <th class="px-4 py-3 text-left">Start</th>
                             <th class="px-4 py-3 text-left">End</th>
                             <th class="px-4 py-3 text-right">Confidence</th>
+                            <th class="px-4 py-3 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($history as $row)
-                            <tr class="border-t hover:bg-gray-50">
-                                <td class="px-4 py-3">{{ $row['date'] }}</td>
-                                <td class="px-4 py-3">{{ $row['store'] }}</td>
-                                <td class="px-4 py-3 text-right">{{ number_format($row['product_count'] ?? 0, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-right">{{ number_format($row['predicted_quantity'] ?? 0, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-right">Rp {{ number_format($row['revenue'], 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-left">{{ $row['start_date'] ?? '-' }}</td>
-                                <td class="px-4 py-3 text-left">{{ $row['end_date'] ?? '-' }}</td>
-                                <td class="px-4 py-3 text-right">{{ number_format($row['confidence'] * 100, 2) }}%</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="px-4 py-6 text-center text-gray-500">Belum ada riwayat prediksi.</td>
-                            </tr>
-                        @endforelse
+                            @forelse($history as $row)
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="px-4 py-3">{{ $row['date'] }}</td>
+                                    <td class="px-4 py-3">{{ $row['store'] }}</td>
+                                    <td class="px-4 py-3 text-right">{{ number_format($row['product_count'] ?? 0, 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-right">{{ number_format($row['predicted_quantity'] ?? 0, 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-right">Rp {{ number_format($row['revenue'], 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-left">{{ $row['start_date'] ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-left">{{ $row['end_date'] ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-right">{{ number_format($row['confidence'] * 100, 2) }}%</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <x-filament::button size="xs" color="info" wire:click="showHistoryDetails({{ $row['store_id'] }}, '{{ $row['date'] }}', '{{ $row['start_date'] ?? '-' }}', '{{ $row['end_date'] ?? '-' }}')">
+                                            Lihat Detail
+                                        </x-filament::button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="9" class="px-4 py-6 text-center text-gray-500">Belum ada riwayat prediksi.</td>
+                                </tr>
+                            @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
+
+        @if($selectedHistoryDetails !== null)
+            <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closeHistoryDetails"></div>
+                <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl z-10">
+                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start w-full">
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-base font-semibold leading-6 text-gray-900 border-b pb-2">
+                                    {{ $selectedHistoryTitle }}
+                                </h3>
+                                <div class="mt-4 max-h-[300px] overflow-y-auto">
+                                    <table class="w-full table-auto text-sm text-left">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-2">Nama Barang</th>
+                                                <th class="px-4 py-2 text-right">Rekomendasi Qty</th>
+                                                <th class="px-4 py-2 text-right">Estimasi Biaya</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($selectedHistoryDetails as $item)
+                                                <tr class="border-t">
+                                                    <td class="px-4 py-2 font-medium">{{ $item['product_name'] }}</td>
+                                                    <td class="px-4 py-2 text-right">{{ number_format($item['qty'], 0, ',', '.') }} {{ $item['unit'] }}</td>
+                                                    <td class="px-4 py-2 text-right">Rp {{ number_format($item['estimated_cost'], 0, ',', '.') }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto" wire:click="closeHistoryDetails">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 </x-filament-panels::page>

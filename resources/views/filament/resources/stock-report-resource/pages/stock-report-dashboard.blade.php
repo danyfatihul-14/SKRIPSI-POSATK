@@ -141,7 +141,7 @@
                                                     default => 'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-400'
                                                 };
                                                 $typeLabel = match($log->type) {
-                                                    'adjustment' => 'Penyesuaian',
+                                                    'adjustment' => 'Barang Masuk',
                                                     'conversion_out' => 'Pecah Stok (-)',
                                                     'conversion_in' => 'Konversi (+)',
                                                     'sale' => 'Penjualan',

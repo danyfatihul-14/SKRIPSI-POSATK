@@ -237,13 +237,7 @@
                     </div>
                 </div>
 
-                {{-- Actions --}}
                 <div class="product-actions">
-                    <button
-                        wire:click="predictProduct({{ $product['product_id'] }})"
-                        class="btn-predict">
-                        Prediksi
-                    </button>
                     <a href="{{ route('filament.admin.resources.products.edit', $product['product_id']) }}" class="btn-edit">
                         Edit
                     </a>
@@ -263,4 +257,5 @@
         </div>
         @endif
     </div>
+
 </x-filament-panels::page>

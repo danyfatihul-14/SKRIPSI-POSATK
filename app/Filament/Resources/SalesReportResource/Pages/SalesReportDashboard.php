@@ -29,6 +29,11 @@ class SalesReportDashboard extends Page
     public array $topProductLabels = [];
     public array $topProductQty = [];
 
+    public ?string $startDate = null;
+    public ?string $endDate = null;
+    public ?array $selectedProductDetails = null;
+    public ?string $selectedProductName = '';
+
     public function mount(): void
     {
         // Fetch stores
@@ -42,10 +47,23 @@ class SalesReportDashboard extends Page
             $this->storeId = null;
         }
 
+        $this->startDate = now()->startOfMonth()->toDateString();
+        $this->endDate = now()->toDateString();
+
         $this->refreshData();
     }
 
     public function updatedStoreId(): void
+    {
+        $this->refreshData();
+    }
+
+    public function updatedStartDate(): void
+    {
+        $this->refreshData();
+    }
+
+    public function updatedEndDate(): void
     {
         $this->refreshData();
     }
@@ -68,24 +86,19 @@ class SalesReportDashboard extends Page
         $this->topProductLabels = [];
         $this->topProductQty = [];
 
-        $periods = [
-            'Harian' => now()->startOfDay(),
-            'Mingguan' => now()->startOfWeek(),
-            'Bulanan' => now()->startOfMonth(),
+        $start = Carbon::parse($this->startDate)->startOfDay();
+        $end = Carbon::parse($this->endDate)->endOfDay();
+
+        $summary = $this->getSummary($start, $end);
+        $this->summaryRows[] = [
+            'periode' => 'Periode Terfilter',
+            'trx' => $summary['trx'],
+            'uang' => $summary['uang'],
+            'profit' => $summary['profit'],
         ];
 
-        foreach ($periods as $label => $start) {
-            $summary = $this->getSummary($start);
-            $this->summaryRows[] = [
-                'periode' => $label,
-                'trx' => $summary['trx'],
-                'uang' => $summary['uang'],
-                'profit' => $summary['profit'],
-            ];
-
-            foreach ($this->getTopProducts($start, $label) as $row) {
-                $this->topRows[] = $row;
-            }
+        foreach ($this->getTopProducts($start, $end, 'Periode Terfilter') as $row) {
+            $this->topRows[] = $row;
         }
 
         $this->loadTrendChartData();     
@@ -98,13 +111,10 @@ class SalesReportDashboard extends Page
             'trx' => $this->trendTrx,
         ]);
 
-        Log::info('Dashboard Data Loaded & Refreshed', [
+        Log::info('Dashboard Data Loaded & Refreshed (Range)', [
             'storeId' => $this->storeId,
-            'trendLabels' => count($this->trendLabels ?? []),
-            'trendSales' => count($this->trendSales ?? []),
-            'trendTrx' => count($this->trendTrx ?? []),
-            'topProductLabels' => count($this->topProductLabels ?? []),
-            'topProductQty' => count($this->topProductQty ?? []),
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
         ]);
     }
 
@@ -137,6 +147,13 @@ class SalesReportDashboard extends Page
         $storeId = $this->storeId;
         if ($storeId) {
             $q->where('t.store_id', $storeId);
+        }
+
+        if ($this->startDate) {
+            $q->whereDate('t.created_at', '>=', $this->startDate);
+        }
+        if ($this->endDate) {
+            $q->whereDate('t.created_at', '<=', $this->endDate);
         }
 
         if (Schema::hasTable('users') && Schema::hasColumn('transactions', 'user_id') && Schema::hasColumn('users', 'user_id')) {
@@ -217,7 +234,7 @@ class SalesReportDashboard extends Page
             ])->toArray();
     }
 
-    protected function getSummary(Carbon $start): array
+    protected function getSummary(Carbon $start, Carbon $end): array
     {
         if (!Schema::hasTable('transactions')) {
             return ['trx' => 0, 'uang' => 0, 'profit' => 0];
@@ -231,7 +248,7 @@ class SalesReportDashboard extends Page
             'amount'
         ]) ?? 'total_amount';
 
-        $query = DB::table('transactions')->where('created_at', '>=', $start);
+        $query = DB::table('transactions')->whereBetween('created_at', [$start, $end]);
 
         $storeId = $this->storeId;
         if ($storeId) {
@@ -262,7 +279,7 @@ class SalesReportDashboard extends Page
             $qDetail = DB::table("$detailTable as d")
                 ->join('transactions as t', "t.transaction_id", '=', "d.$trxFk")
                 ->join('products as p', "p.$prodPk", '=', "d.$prodFk")
-                ->where('t.created_at', '>=', $start);
+                ->whereBetween('t.created_at', [$start, $end]);
 
             if ($storeId) {
                 $qDetail->where('t.store_id', $storeId);
@@ -294,7 +311,7 @@ class SalesReportDashboard extends Page
         ];
     }
 
-    protected function getTopProducts(Carbon $start, string $periode): array
+    protected function getTopProducts(Carbon $start, Carbon $end, string $periode): array
     {
         $detailTable = $this->firstExistingTable(['transaction_items', 'transaction_details', 'sale_items', 'sales_items']);
         if (!$detailTable || !Schema::hasTable('transactions') || !Schema::hasTable('products')) {
@@ -319,7 +336,7 @@ class SalesReportDashboard extends Page
         $query = DB::table("$detailTable as d")
             ->join('transactions as t', "t.$trxPk", '=', "d.$trxFk")
             ->join('products as p', "p.$prodPk", '=', "d.$prodFk")
-            ->where('t.created_at', '>=', $start);
+            ->whereBetween('t.created_at', [$start, $end]);
 
         $storeId = $this->storeId;
         if ($storeId) {
@@ -332,7 +349,6 @@ class SalesReportDashboard extends Page
 
         $unitCol = $this->firstExistingColumn('products', ['unit']) ?? null;
         $unitSelect = $unitCol ? ", p.$unitCol as unit" : ", 'pcs' as unit";
-        $unitGroupBy = $unitCol ? ", p.$unitCol" : "";
 
         $groupBy = ["p.$prodPk", "p.$prodName"];
         if ($unitCol) {
@@ -343,6 +359,7 @@ class SalesReportDashboard extends Page
             ->groupBy($groupBy)
             ->selectRaw("
                 '$periode' as periode,
+                p.$prodPk as product_id,
                 p.$prodName as product_name,
                 SUM(d.$qtyCol) as qty,
                 $omzetExpr as omzet
@@ -353,6 +370,7 @@ class SalesReportDashboard extends Page
             ->get()
             ->map(fn($x) => [
                 'periode' => $x->periode,
+                'product_id' => $x->product_id,
                 'product_name' => $x->product_name,
                 'qty' => (int) $x->qty,
                 'omzet' => (float) $x->omzet,
@@ -389,10 +407,16 @@ class SalesReportDashboard extends Page
             'amount'
         ]) ?? 'total_amount';
 
-        $start = now()->subDays(29)->startOfDay();
+        $start = Carbon::parse($this->startDate)->startOfDay();
+        $end = Carbon::parse($this->endDate)->endOfDay();
+        $diffDays = $start->diffInDays($end);
+        if ($diffDays > 60) {
+            $diffDays = 60;
+            $start = $end->copy()->subDays(60)->startOfDay();
+        }
 
         $q = DB::table('transactions')
-            ->where('created_at', '>=', $start);
+            ->whereBetween('created_at', [$start, $end]);
 
         $storeId = $this->storeId;
         if ($storeId) {
@@ -413,8 +437,8 @@ class SalesReportDashboard extends Page
         $sales = [];
         $trx = [];
 
-        for ($i = 29; $i >= 0; $i--) {
-            $date = now()->subDays($i)->toDateString();
+        for ($i = $diffDays; $i >= 0; $i--) {
+            $date = $end->copy()->subDays($i)->toDateString();
             $labels[] = \Carbon\Carbon::parse($date)->format('d M');
             $sales[] = (float) ($rows[$date]->sales ?? 0);
             $trx[] = (int) ($rows[$date]->trx ?? 0);
@@ -427,9 +451,69 @@ class SalesReportDashboard extends Page
 
     protected function loadTopProductChartData(): void
     {
-        $monthlyTop = collect($this->getTopProducts(now()->startOfMonth(), 'Bulanan'));
+        $start = Carbon::parse($this->startDate)->startOfDay();
+        $end = Carbon::parse($this->endDate)->endOfDay();
+        $topProducts = collect($this->getTopProducts($start, $end, 'Periode Terfilter'));
 
-        $this->topProductLabels = $monthlyTop->pluck('product_name')->values()->toArray();
-        $this->topProductQty = $monthlyTop->pluck('qty')->map(fn($x) => (int) $x)->values()->toArray();
+        $this->topProductLabels = $topProducts->pluck('product_name')->values()->toArray();
+        $this->topProductQty = $topProducts->pluck('qty')->map(fn($x) => (int) $x)->values()->toArray();
+    }
+
+    public function showProductSalesDetail(int $productId): void
+    {
+        $product = \App\Models\Product::find($productId);
+        if (!$product) return;
+
+        $this->selectedProductName = $product->product_name;
+
+        $detailTable = $this->firstExistingTable(['transaction_items', 'transaction_details', 'sale_items', 'sales_items']);
+        $trxFk = $this->firstExistingColumn($detailTable, ['transaction_id', 'sale_id', 'sales_id']) ?? 'transaction_id';
+        $qtyCol = $this->firstExistingColumn($detailTable, ['quantity', 'qty', 'jumlah']) ?? 'quantity';
+        $priceCol = $this->firstExistingColumn($detailTable, ['unit_price', 'price', 'selling_price']) ?? 'unit_price';
+        $subCol = $this->firstExistingColumn($detailTable, ['subtotal', 'line_total', 'total']) ?? 'subtotal';
+
+        $query = DB::table("$detailTable as d")
+            ->join('transactions as t', 't.transaction_id', '=', "d.$trxFk")
+            ->join('stores as s', 's.store_id', '=', 't.store_id')
+            ->where('d.product_id', $productId);
+
+        if ($this->storeId) {
+            $query->where('t.store_id', $this->storeId);
+        }
+
+        if ($this->startDate) {
+            $query->whereDate('t.created_at', '>=', $this->startDate);
+        }
+        if ($this->endDate) {
+            $query->whereDate('t.created_at', '<=', $this->endDate);
+        }
+
+        $query->whereIn('t.status', ['paid', 'success', 'completed', 'selesai']);
+
+        $rows = $query->selectRaw("
+            t.transaction_code as code,
+            t.created_at as time,
+            s.name_store as store_name,
+            d.$qtyCol as qty,
+            d.$priceCol as price,
+            d.$subCol as subtotal
+        ")
+        ->orderByDesc('t.created_at')
+        ->get();
+
+        $this->selectedProductDetails = $rows->map(fn($r) => [
+            'code' => $r->code,
+            'time' => \Carbon\Carbon::parse($r->time)->format('d/m/Y H:i'),
+            'store_name' => $r->store_name,
+            'qty' => (int) $r->qty,
+            'price' => (float) $r->price,
+            'subtotal' => (float) $r->subtotal,
+        ])->toArray();
+    }
+
+    public function closeProductSalesDetail(): void
+    {
+        $this->selectedProductDetails = null;
+        $this->selectedProductName = '';
     }
 }
