@@ -69,6 +69,7 @@ class XgboostPrediction extends Page
 
         $success = 0;
         $failed = 0;
+        $firstError = null;
         $dailyRecommendations = [];
         $rawPredictedUnits = 0;
         $recommendedUnits = 0;
@@ -187,17 +188,58 @@ class XgboostPrediction extends Page
                 $success++;
             } catch (\Throwable $e) {
                 $failed++;
+                if (!$firstError) {
+                    $firstError = $e->getMessage() . ' (Line: ' . $e->getLine() . ' in ' . basename($e->getFile()) . ')';
+                }
                 Log::warning('Bulk prediction failed for product ' . ($product->product_id ?? 'unknown') . ': ' . $e->getMessage());
             }
         }
 
-        ksort($dailyRecommendations);
-        foreach ($dailyRecommendations as &$day) {
-            usort($day['items'], static fn (array $a, array $b): int => $b['qty'] <=> $a['qty']);
+        $aggregatedItems = [];
+        $totalCost = 0;
+        $dates = array_keys($dailyRecommendations);
+        if (!empty($dates)) {
+            sort($dates);
+            $startDateStr = date('d/m/Y', strtotime($dates[0]));
+            $endDateStr = date('d/m/Y', strtotime($dates[count($dates) - 1]));
+            $dateRangeText = ($dates[0] === $dates[count($dates) - 1]) 
+                ? $startDateStr 
+                : $startDateStr . ' - ' . $endDateStr;
+        } else {
+            $dateRangeText = now()->addDay()->format('d/m/Y');
         }
-        unset($day);
 
-        $this->dailyRecommendations = array_values($dailyRecommendations);
+        foreach ($dailyRecommendations as $day) {
+            foreach ($day['items'] as $item) {
+                $name = $item['product_name'];
+                if (!isset($aggregatedItems[$name])) {
+                    $aggregatedItems[$name] = [
+                        'product_name' => $name,
+                        'qty' => 0,
+                        'unit' => $item['unit'],
+                        'estimated_cost' => 0,
+                    ];
+                }
+                $aggregatedItems[$name]['qty'] += $item['qty'];
+                $aggregatedItems[$name]['estimated_cost'] += $item['estimated_cost'];
+                $totalCost += $item['estimated_cost'];
+            }
+        }
+
+        usort($aggregatedItems, static fn ($a, $b) => $b['qty'] <=> $a['qty']);
+
+        if ($recommendedUnits > 0) {
+            $this->dailyRecommendations = [
+                [
+                    'date' => $dateRangeText,
+                    'total_qty' => $recommendedUnits,
+                    'total_cost' => $totalCost,
+                    'items' => $aggregatedItems,
+                ]
+            ];
+        } else {
+            $this->dailyRecommendations = [];
+        }
         $this->runSummary = [
             'products' => $success,
             'recommended_items' => $recommendedItems,
@@ -211,11 +253,19 @@ class XgboostPrediction extends Page
             $this->runStatusMessage = sprintf('Rekomendasi kulak final tersedia untuk %d item dengan total %d unit.', $recommendedItems, $recommendedUnits);
         }
 
-        Notification::make()
-            ->success()
-            ->title('Prediksi selesai')
-            ->body(sprintf('Berhasil: %d produk, Gagal: %d produk', $success, $failed))
-            ->send();
+        if ($failed > 0) {
+            Notification::make()
+                ->danger()
+                ->title('Prediksi Selesai dengan Error')
+                ->body(sprintf('Berhasil: %d, Gagal: %d. Error pertama: %s', $success, $failed, $firstError))
+                ->send();
+        } else {
+            Notification::make()
+                ->success()
+                ->title('Prediksi selesai')
+                ->body(sprintf('Berhasil: %d produk, Gagal: %d produk', $success, $failed))
+                ->send();
+        }
 
         $this->loadHistory();
     }
@@ -294,80 +344,80 @@ class XgboostPrediction extends Page
 
         $rows = $rows->get();
 
-        $dailyRecommendations = [];
+        $aggregatedItems = [];
+        $totalQty = 0;
+        $totalCost = 0;
 
         foreach ($rows as $row) {
             $dailyRecommended = $row->featured_used['daily_recommendations'] ?? [];
 
             if (! empty($dailyRecommended) && is_array($dailyRecommended)) {
                 foreach ($dailyRecommended as $prediksi) {
-                    $tanggal = $prediksi['tanggal'] ?? null;
                     $qty = (int) ($prediksi['rekomendasi_kulak'] ?? 0);
-
-                    if (! $tanggal || $qty <= 0) {
+                    if ($qty <= 0) {
                         continue;
                     }
 
-                    if (! isset($dailyRecommendations[$tanggal])) {
-                        $dailyRecommendations[$tanggal] = [
-                            'date' => $tanggal,
-                            'total_qty' => 0,
-                            'total_cost' => 0,
-                            'items' => [],
+                    $name = $row->product?->product_name ?? '-';
+                    if (!isset($aggregatedItems[$name])) {
+                        $aggregatedItems[$name] = [
+                            'product_name' => $name,
+                            'qty' => 0,
+                            'unit' => $row->product?->unit ?? 'pcs',
+                            'estimated_cost' => 0,
                         ];
                     }
-
                     $estimatedCost = $qty * (int) ($row->selling_price ?? 0);
-                    $dailyRecommendations[$tanggal]['total_qty'] += $qty;
-                    $dailyRecommendations[$tanggal]['total_cost'] += $estimatedCost;
-                    $dailyRecommendations[$tanggal]['items'][] = [
-                        'product_name' => $row->product?->product_name ?? '-',
-                        'qty' => $qty,
-                        'unit' => $row->product?->unit ?? 'pcs',
-                        'estimated_cost' => $estimatedCost,
-                    ];
+                    $aggregatedItems[$name]['qty'] += $qty;
+                    $aggregatedItems[$name]['estimated_cost'] += $estimatedCost;
+                    $totalQty += $qty;
+                    $totalCost += $estimatedCost;
                 }
-
                 continue;
             }
 
             $daily = $row->featured_used['daily_predictions'] ?? [];
             foreach ($daily as $prediksi) {
-                $tanggal = $prediksi['tanggal'] ?? null;
                 $qty = (int) ($prediksi['prediksi'] ?? 0);
-
-                if (! $tanggal || $qty <= 0) {
+                if ($qty <= 0) {
                     continue;
                 }
 
-                if (! isset($dailyRecommendations[$tanggal])) {
-                    $dailyRecommendations[$tanggal] = [
-                        'date' => $tanggal,
-                        'total_qty' => 0,
-                        'total_cost' => 0,
-                        'items' => [],
+                $name = $row->product?->product_name ?? '-';
+                if (!isset($aggregatedItems[$name])) {
+                    $aggregatedItems[$name] = [
+                        'product_name' => $name,
+                        'qty' => 0,
+                        'unit' => $row->product?->unit ?? 'pcs',
+                        'estimated_cost' => 0,
                     ];
                 }
-
                 $estimatedCost = $qty * (int) ($row->selling_price ?? 0);
-                $dailyRecommendations[$tanggal]['total_qty'] += $qty;
-                $dailyRecommendations[$tanggal]['total_cost'] += $estimatedCost;
-                $dailyRecommendations[$tanggal]['items'][] = [
-                    'product_name' => $row->product?->product_name ?? '-',
-                    'qty' => $qty,
-                    'unit' => $row->product?->unit ?? 'pcs',
-                    'estimated_cost' => $estimatedCost,
-                ];
+                $aggregatedItems[$name]['qty'] += $qty;
+                $aggregatedItems[$name]['estimated_cost'] += $estimatedCost;
+                $totalQty += $qty;
+                $totalCost += $estimatedCost;
             }
         }
 
-        ksort($dailyRecommendations);
-        foreach ($dailyRecommendations as &$day) {
-            usort($day['items'], static fn (array $a, array $b): int => $b['qty'] <=> $a['qty']);
-        }
-        unset($day);
+        usort($aggregatedItems, static fn ($a, $b) => $b['qty'] <=> $a['qty']);
 
-        $this->dailyRecommendations = array_values($dailyRecommendations);
+        if ($totalQty > 0) {
+            $startStr = $latest->start_date ? $latest->start_date->format('d/m/Y') : '';
+            $endStr = $latest->end_date ? $latest->end_date->format('d/m/Y') : '';
+            $dateRangeText = ($startStr === $endStr) ? $startStr : $startStr . ' - ' . $endStr;
+
+            $this->dailyRecommendations = [
+                [
+                    'date' => $dateRangeText ?: now()->addDay()->format('d/m/Y'),
+                    'total_qty' => $totalQty,
+                    'total_cost' => $totalCost,
+                    'items' => $aggregatedItems,
+                ]
+            ];
+        } else {
+            $this->dailyRecommendations = [];
+        }
     }
 
     public function checkMlService(): void

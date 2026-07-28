@@ -463,7 +463,7 @@
             <!-- Transaction Info -->
             <div class="thermal-code">{{ $transaction->transaction_code }}</div>
             <div class="thermal-datetime">
-                {{ optional($transaction->created_at)->format('d/m/Y H:i') }}<br>
+                {{ optional($transaction->created_at)->timezone('Asia/Jakarta')->format('d/m/Y H:i') }}<br>
                 Kasir: {{ $transaction->user?->name ?? '-' }}<br>
                 Pembeli: {{ $transaction->customer_name ?? 'Pelanggan Umum' }}
             </div>
@@ -521,6 +521,16 @@
                     <span>Metode</span>
                     <span>{{ strtoupper($transaction->payment_method ?? '-') }}</span>
                 </div>
+                @if (strtoupper($transaction->payment_method ?? '') === 'CASH')
+                <div class="thermal-summary-row">
+                    <span>Bayar</span>
+                    <span>Rp{{ number_format($transaction->cash_paid ?? $transaction->total_amount, 0, ',', '.') }}</span>
+                </div>
+                <div class="thermal-summary-row">
+                    <span>Kembalian</span>
+                    <span>Rp{{ number_format($transaction->cash_change ?? 0, 0, ',', '.') }}</span>
+                </div>
+                @endif
             </div>
 
             <!-- Footer -->

@@ -132,6 +132,11 @@
             grouped[name].push(prod);
         });
 
+        // Sort variants within each group by price ascending
+        Object.keys(grouped).forEach(name => {
+            grouped[name].sort((a, b) => parseFloat(a.selling_price || 0) - parseFloat(b.selling_price || 0));
+        });
+
         const groupedList = Object.values(grouped);
         if (countEl) countEl.innerText = groupedList.length;
 
@@ -259,6 +264,10 @@
         }).join('');
     }
 
+    function isDynamicPriceProduct(prod) {
+        return prod && !!prod.is_dynamic_price;
+    }
+
     function addCart(id, name, price, btn = null) {
         const prod = products.find(p => p.product_id == id);
         if (!prod) return;
@@ -269,7 +278,54 @@
             return;
         }
 
-        let idx = cart.findIndex(i => i.id == id);
+        const isDynamic = isDynamicPriceProduct(prod);
+
+        if (isDynamic) {
+            const promptTitle = 'Input Harga Jual';
+            const promptMsg = `Masukkan harga jual untuk <strong>${prod.product_name}</strong>:`;
+            const inputId = 'promptPriceInput_' + Date.now();
+            const defaultPrice = Math.round(price || prod.selling_price) || 0;
+            
+            const content = `
+                <div style="text-align: left; margin-bottom: 12px; font-size: 14px; color: var(--dark);">${promptMsg}</div>
+                <input type="number" id="${inputId}" class="form-control" placeholder="Contoh: 15000" value="${defaultPrice}" style="width: 100%; padding: 10px 12px; border: 2px solid var(--accent); border-radius: 8px; box-sizing: border-box; font-size: 15px; font-weight: 700; color: var(--dark);" min="0">
+            `;
+            
+            openAppModal({
+                size: 'modal-sm',
+                title: promptTitle,
+                message: content,
+                okText: 'Simpan',
+                cancelText: 'Batal',
+                showCancel: true,
+                onOk: () => {
+                    const priceVal = parseFloat(document.getElementById(inputId).value) || 0;
+                    if (priceVal <= 0) {
+                        window.showAlert('Harga jual tidak boleh kosong atau kurang dari sama dengan 0.', 'warning');
+                        return;
+                    }
+                    executeAddCart(id, name, priceVal, btn);
+                }
+            });
+
+            setTimeout(() => {
+                const inp = document.getElementById(inputId);
+                if (inp) {
+                    inp.focus();
+                    inp.select();
+                }
+            }, 100);
+            return;
+        }
+
+        executeAddCart(id, name, price, btn);
+    }
+
+    function executeAddCart(id, name, price, btn = null) {
+        const prod = products.find(p => p.product_id == id);
+        if (!prod) return;
+
+        let idx = cart.findIndex(i => i.id == id && i.price == parseFloat(price));
         if (idx >= 0) {
             cart[idx].qty++;
         } else {
@@ -514,8 +570,10 @@
         const cancel = document.getElementById('appModalCancel');
         if (!modal || !dialog || !title || !body || !ok || !cancel) return;
 
-        dialog.classList.remove('modal-sm', 'modal-xl');
-        dialog.classList.add(config.size === 'modal-xl' ? 'modal-xl' : 'modal-sm');
+        dialog.classList.remove('modal-sm', 'modal-xl', 'modal-md');
+        if (config.size === 'modal-xl') dialog.classList.add('modal-xl');
+        else if (config.size === 'modal-md') dialog.classList.add('modal-md');
+        else dialog.classList.add('modal-sm');
 
         title.textContent = config.title;
         body.innerHTML = config.message;
@@ -570,7 +628,8 @@
     let selectedVariantId = null;
 
     window.openVariantModal = function(productName) {
-        currentVariants = products.filter(p => p.product_name === productName);
+        currentVariants = products.filter(p => p.product_name === productName)
+                                  .sort((a, b) => parseFloat(a.selling_price || 0) - parseFloat(b.selling_price || 0));
         if (currentVariants.length === 0) return;
 
         // Select the first variant that has available stock > 0, otherwise select the first variant
@@ -697,12 +756,53 @@
             ? `${activeVar.product_name} (${vName})` 
             : activeVar.product_name;
 
+        const isDynamic = isDynamicPriceProduct(activeVar);
+
+        if (isDynamic) {
+            const promptTitle = 'Input Harga Jual';
+            const promptMsg = `Masukkan harga jual untuk <strong>${displayName}</strong>:`;
+            const inputId = 'promptPriceInput_' + Date.now();
+            const defaultPrice = Math.round(activeVar.selling_price) || 0;
+            
+            const content = `
+                <div style="text-align: left; margin-bottom: 12px; font-size: 14px; color: var(--dark);">${promptMsg}</div>
+                <input type="number" id="${inputId}" class="form-control" placeholder="Contoh: 15000" value="${defaultPrice}" style="width: 100%; padding: 10px 12px; border: 2px solid var(--accent); border-radius: 8px; box-sizing: border-box; font-size: 15px; font-weight: 700; color: var(--dark);" min="0">
+            `;
+            
+            openAppModal({
+                size: 'modal-sm',
+                title: promptTitle,
+                message: content,
+                okText: 'Simpan',
+                cancelText: 'Batal',
+                showCancel: true,
+                onOk: () => {
+                    const priceVal = parseFloat(document.getElementById(inputId).value) || 0;
+                    if (priceVal <= 0) {
+                        window.showAlert('Harga jual tidak boleh kosong atau kurang dari sama dengan 0.', 'warning');
+                        return;
+                    }
+                    addCartWithQty(activeVar.product_id, displayName, priceVal, qty, activeVar.stock ?? 0);
+                    closeVariantModal();
+                }
+            });
+
+            setTimeout(() => {
+                const inp = document.getElementById(inputId);
+                if (inp) {
+                    inp.focus();
+                    inp.select();
+                }
+            }, 100);
+            return;
+        }
+
         addCartWithQty(activeVar.product_id, displayName, activeVar.selling_price, qty, activeVar.stock ?? 0);
         closeVariantModal();
     }
 
     function addCartWithQty(id, name, price, qty, maxStock) {
-        let idx = cart.findIndex(i => i.id == id);
+        let idx = cart.findIndex(i => i.id == id && i.price == parseFloat(price));
         if (idx >= 0) {
             cart[idx].qty += qty;
         } else {

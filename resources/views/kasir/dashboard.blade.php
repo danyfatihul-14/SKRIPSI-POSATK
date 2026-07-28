@@ -420,6 +420,10 @@
             max-width: 420px
         }
 
+        .app-modal__dialog.modal-md {
+            max-width: 580px
+        }
+
         .app-modal__dialog.modal-xl {
             max-width: 980px
         }
@@ -829,6 +833,7 @@
         });
     </script>
 
+    <script src="{{ asset('js/html5-qrcode.min.js') }}" type="text/javascript"></script>
     @include('kasir.scripts.kasir')
     @include('kasir.scripts.keranjang')
     @include('kasir.scripts.stok')
@@ -959,8 +964,10 @@
             const cancel = document.getElementById('appModalCancel');
             if (!modal || !dialog || !title || !body || !ok || !cancel) return;
 
-            dialog.classList.remove('modal-sm', 'modal-xl');
-            dialog.classList.add(cfg.size === 'modal-xl' ? 'modal-xl' : 'modal-sm');
+            dialog.classList.remove('modal-sm', 'modal-xl', 'modal-md');
+            if (cfg.size === 'modal-xl') dialog.classList.add('modal-xl');
+            else if (cfg.size === 'modal-md') dialog.classList.add('modal-md');
+            else dialog.classList.add('modal-sm');
 
             title.textContent = cfg.title;
             body.innerHTML = cfg.message;

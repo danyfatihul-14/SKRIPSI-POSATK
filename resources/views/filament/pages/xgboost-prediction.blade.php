@@ -129,40 +129,59 @@
         </div>
 
         @if($selectedHistoryDetails !== null)
-            <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closeHistoryDetails"></div>
-                <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl z-10">
-                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start w-full">
-                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-                                <h3 class="text-base font-semibold leading-6 text-gray-900 border-b pb-2">
-                                    {{ $selectedHistoryTitle }}
-                                </h3>
-                                <div class="mt-4 max-h-[300px] overflow-y-auto">
-                                    <table class="w-full table-auto text-sm text-left">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th class="px-4 py-2">Nama Barang</th>
-                                                <th class="px-4 py-2 text-right">Rekomendasi Qty</th>
-                                                <th class="px-4 py-2 text-right">Estimasi Biaya</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($selectedHistoryDetails as $item)
-                                                <tr class="border-t">
-                                                    <td class="px-4 py-2 font-medium">{{ $item['product_name'] }}</td>
-                                                    <td class="px-4 py-2 text-right">{{ number_format($item['qty'], 0, ',', '.') }} {{ $item['unit'] }}</td>
-                                                    <td class="px-4 py-2 text-right">Rp {{ number_format($item['estimated_cost'], 0, ',', '.') }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+            @php
+                $totalQty = collect($selectedHistoryDetails)->sum('qty');
+                $totalCost = collect($selectedHistoryDetails)->sum('estimated_cost');
+            @endphp
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background-color: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);">
+                <div class="fixed inset-0" wire:click="closeHistoryDetails"></div>
+                
+                <div class="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-10 overflow-hidden transition-all duration-300" style="max-height: 90vh;">
+                    
+                    <!-- Header -->
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-gray-50">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">📊</span>
+                            <h3 class="text-lg font-bold text-gray-900 leading-none">
+                                {{ $selectedHistoryTitle }}
+                            </h3>
+                        </div>
+                        <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors text-2xl font-semibold leading-none p-1" wire:click="closeHistoryDetails">
+                            &times;
+                        </button>
+                    </div>
+                    
+                    <!-- Header Row (Static) -->
+                    <div class="flex items-center justify-between bg-gray-50 border-b border-gray-100 px-6 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <div class="flex-1" style="max-width: 60%;">Nama Barang</div>
+                        <div class="flex items-center gap-6 text-right">
+                            <div class="w-28">Rekomendasi Qty</div>
+                            <div class="w-32">Estimasi Biaya</div>
                         </div>
                     </div>
-                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                        <button type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto" wire:click="closeHistoryDetails">
+                    
+                    <!-- Body / List (Scrollable) -->
+                    <div class="flex-1 overflow-y-auto px-6 divide-y divide-gray-100" style="max-height: 50vh; min-height: 250px;">
+                        @foreach($selectedHistoryDetails as $item)
+                            <div class="flex items-center justify-between py-2 hover:bg-gray-50/80 transition-colors text-sm">
+                                <div class="flex-1 font-medium text-gray-800 pr-4 truncate" style="max-width: 60%;" title="{{ $item['product_name'] }}">
+                                    {{ $item['product_name'] }}
+                                </div>
+                                <div class="flex items-center gap-6 text-right text-gray-600">
+                                    <div class="w-28 font-semibold">{{ number_format($item['qty'], 0, ',', '.') }} {{ $item['unit'] }}</div>
+                                    <div class="w-32 font-medium text-gray-900">Rp {{ number_format($item['estimated_cost'], 0, ',', '.') }}</div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    
+                    <!-- Footer / Summary -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-gray-100 px-6 py-4 bg-gray-50">
+                        <div class="text-sm text-gray-700 font-medium">
+                            Ringkasan: <span class="text-blue-600 font-bold">{{ number_format($totalQty, 0, ',', '.') }} unit</span> | 
+                            Total Biaya: <span class="text-green-600 font-bold">Rp {{ number_format($totalCost, 0, ',', '.') }}</span>
+                        </div>
+                        <button type="button" class="inline-flex justify-center rounded-xl bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors" wire:click="closeHistoryDetails">
                             Tutup
                         </button>
                     </div>

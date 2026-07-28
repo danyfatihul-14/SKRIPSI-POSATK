@@ -279,6 +279,7 @@ class SalesReportDashboard extends Page
             $qDetail = DB::table("$detailTable as d")
                 ->join('transactions as t', "t.transaction_id", '=', "d.$trxFk")
                 ->join('products as p', "p.$prodPk", '=', "d.$prodFk")
+                ->leftJoin('categories as c', 'c.category_id', '=', 'p.category_id')
                 ->whereBetween('t.created_at', [$start, $end]);
 
             if ($storeId) {
@@ -289,11 +290,48 @@ class SalesReportDashboard extends Page
                 $qDetail->whereIn('t.status', ['paid', 'success', 'completed', 'selesai']);
             }
 
+            // Fetch dynamic categories
+            $dynamicCategories = DB::table('categories')
+                ->where('is_dynamic_price', true)
+                ->get();
+
+            $cases = [];
+            foreach ($dynamicCategories as $cat) {
+                $margin = (float)($cat->profit_margin ?? 0) / 100.0;
+                $conditions = ["p.category_id = {$cat->category_id}"];
+                
+                if (!empty($cat->keywords)) {
+                    $keywordsList = json_decode($cat->keywords, true);
+                    if (!is_array($keywordsList)) {
+                        $keywordsList = array_map('trim', explode(',', $cat->keywords));
+                    }
+                    foreach ($keywordsList as $kw) {
+                        if ($kw !== '') {
+                            $escapedKw = str_replace("'", "''", $kw);
+                            $conditions[] = "p.product_name LIKE '%{$escapedKw}%'";
+                        }
+                    }
+                }
+                
+                $condStr = implode(' OR ', $conditions);
+                $cases[] = "WHEN ({$condStr}) THEN ($priceExpr * {$margin}) * d.$qtyCol";
+            }
+            
+            $casesSql = implode("\n                            ", $cases);
+            if (empty($casesSql)) {
+                $casesSql = "WHEN (1=0) THEN 0";
+            }
+
             $rowDetail = $qDetail
                 ->selectRaw("
                     COUNT(DISTINCT t.transaction_id) as total_trx,
                     COALESCE(SUM($priceExpr * d.$qtyCol), 0) as total_uang,
-                    COALESCE(SUM(($priceExpr - p.purchase_price) * d.$qtyCol), 0) as total_profit
+                    COALESCE(SUM(
+                        CASE 
+                            $casesSql
+                            ELSE ($priceExpr - p.purchase_price) * d.$qtyCol
+                        END
+                    ), 0) as total_profit
                 ")
                 ->first();
 

@@ -10,6 +10,14 @@ Route::get('/', [PublicController::class, 'index'])->name('public.dashboard');
 Route::get('/catalog', [PublicController::class, 'catalog'])->name('public.catalog');
 Route::get('/catalog/{product}', [PublicController::class, 'show'])->name('public.product.show');
 
+Route::get('/clear-cache', function () {
+    \Illuminate\Support\Facades\Artisan::call('config:clear');
+    \Illuminate\Support\Facades\Artisan::call('cache:clear');
+    \Illuminate\Support\Facades\Artisan::call('view:clear');
+    \Illuminate\Support\Facades\Artisan::call('route:clear');
+    return "Semua cache Laravel berhasil dibersihkan!";
+});
+
 Route::get('/login', [LoginController::class, 'show'])->name('login');
 Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');

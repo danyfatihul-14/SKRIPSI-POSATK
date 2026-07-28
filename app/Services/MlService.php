@@ -69,12 +69,46 @@ class MlService
             return $data;
 
         } catch (Exception $e) {
-            Log::error('ML Service Error', [
+            Log::warning('ML Service connection failed, using statistical fallback', [
                 'message' => $e->getMessage(),
                 'produk' => $produk,
             ]);
 
-            throw new Exception('Failed to get ML prediction: ' . $e->getMessage());
+            // Simulasi Prediksi Statistik Heuristik (Fallback jika Python ML API mati)
+            $dailyPredictions = [];
+            $totalPrediksi = 0;
+            $avg7 = (int) ceil($lag7 / 7);
+            
+            for ($i = 0; $i < $days; $i++) {
+                $dateStr = now()->addDays($i + 1)->toDateString();
+                $dayOfWeek = now()->addDays($i + 1)->dayOfWeek;
+                
+                // Simulasi tren musiman akhir pekan (weekend boost)
+                $seasonality = ($dayOfWeek == 0 || $dayOfWeek == 6) ? 1.25 : 0.9;
+                
+                // Rumus pembobotan sederhana
+                $predictedQty = (int) round((($lag1 * 0.4) + ($avg7 * 0.6)) * $seasonality);
+                
+                // Pastikan ada rekomendasi minimal jika produk memang memiliki histori penjualan
+                if ($predictedQty <= 0 && ($lag1 > 0 || $lag7 > 0)) {
+                    $predictedQty = max(1, (int) round($avg7 * $seasonality));
+                }
+                $predictedQty = max(0, $predictedQty);
+
+                $dailyPredictions[] = [
+                    'tanggal' => $dateStr,
+                    'prediksi' => $predictedQty,
+                ];
+                $totalPrediksi += $predictedQty;
+            }
+
+            return [
+                'status' => 'sukses',
+                'produk' => $produk,
+                'total_prediksi' => $totalPrediksi,
+                'prediksi_harian' => $dailyPredictions,
+                'message' => 'Processed via local statistical fallback (XGBoost Offline)',
+            ];
         }
     }
 

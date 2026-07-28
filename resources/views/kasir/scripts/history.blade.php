@@ -162,18 +162,75 @@
         const txn = allTransactions.find(t => String(t.transaction_id || t.id) === String(transactionId));
         if (!txn) return;
 
-        const detail = `
-            <strong>ID Transaksi:</strong> #${txn.transaction_code || txn.transaction_id || txn.id}<br>
-            <strong>Tanggal:</strong> ${formatDateTime(txn.created_at)}<br>
-            <strong>Metode Pembayaran:</strong> ${txn.payment_method ? txn.payment_method.toUpperCase() : 'CASH'}<br>
-            <strong>Total:</strong> Rp${Number(txn.total_amount || 0).toLocaleString('id-ID')}<br>
-            <strong>Status:</strong> ${txn.status === 'pending' ? 'Menunggu' : 'Selesai'}<br>
-            <strong>Kasir:</strong> ${txn.served_by || '-'}<br>
-            <strong>Pembeli:</strong> ${escapeHtml(txn.customer_name || 'Pelanggan Umum')}<br>
-            <strong>Notes:</strong> ${escapeHtml(txn.notes || '-')}
+        let detail = `
+            <div style="font-size: 13px; color: var(--dark); line-height: 1.5; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 16px;">
+                <div><strong>ID Transaksi:</strong> #${txn.transaction_code || txn.transaction_id || txn.id}</div>
+                <div><strong>Tanggal:</strong> ${formatDateTime(txn.created_at)}</div>
+                <div><strong>Metode Pembayaran:</strong> ${txn.payment_method ? txn.payment_method.toUpperCase() : 'CASH'}</div>
+                <div><strong>Kasir:</strong> ${txn.served_by || '-'}</div>
+                <div><strong>Pembeli:</strong> ${escapeHtml(txn.customer_name || 'Pelanggan Umum')}</div>
+                <div><strong>Status:</strong> ${txn.status === 'pending' ? 'Menunggu' : 'Selesai'}</div>
+                <div style="grid-column: 1 / -1;"><strong>Catatan/Notes:</strong> ${escapeHtml(txn.notes || '-')}</div>
+            </div>
         `;
 
-        window.showAlert(detail, 'info');
+        let itemsHtml = `
+            <div style="border-top: 1px dashed #cbd5e1; padding-top: 12px;">
+                <h4 style="font-weight: 700; font-size: 13px; color: var(--dark); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;">Daftar Item Belanja</h4>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #cbd5e1; color: #475569;">
+                            <th style="padding: 6px 4px;">Nama Barang</th>
+                            <th style="padding: 6px 4px; text-align: center; width: 60px;">Qty</th>
+                            <th style="padding: 6px 4px; text-align: right; width: 100px;">Harga Satuan</th>
+                            <th style="padding: 6px 4px; text-align: right; width: 110px;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        if (txn.items && txn.items.length > 0) {
+            txn.items.forEach(item => {
+                itemsHtml += `
+                    <tr style="border-bottom: 1px solid #f1f5f9; color: var(--dark);">
+                        <td style="padding: 6px 4px; font-weight: 600;">${escapeHtml(item.product_name)}</td>
+                        <td style="padding: 6px 4px; text-align: center;">${item.quantity}</td>
+                        <td style="padding: 6px 4px; text-align: right;">Rp${Number(item.unit_price).toLocaleString('id-ID')}</td>
+                        <td style="padding: 6px 4px; text-align: right; font-weight: 600;">Rp${Number(item.subtotal).toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            itemsHtml += `
+                <tr>
+                    <td colspan="4" style="padding: 12px 4px; text-align: center; color: #94a3b8;">Tidak ada data barang.</td>
+                </tr>
+            `;
+        }
+
+        itemsHtml += `
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: 700; font-size: 13px; color: var(--accent); border-top: 2px solid #cbd5e1;">
+                            <td colspan="3" style="padding: 10px 4px; text-align: left;">TOTAL BELANJA</td>
+                            <td style="padding: 10px 4px; text-align: right;">Rp${Number(txn.total_amount || 0).toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+
+        if (typeof openAppModal === 'function') {
+            openAppModal({
+                size: 'modal-md',
+                title: 'Detail Transaksi',
+                message: detail + itemsHtml,
+                okText: 'Tutup',
+                showCancel: false
+            });
+        } else {
+            window.showAlert(detail + itemsHtml, 'info');
+        }
     }
 
     function escapeHtml(value) {

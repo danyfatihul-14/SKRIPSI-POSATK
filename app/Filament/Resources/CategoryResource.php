@@ -6,6 +6,8 @@ use App\Filament\Resources\CategoryResource\Pages;
 use App\Models\Category;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -13,6 +15,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 
 class CategoryResource extends Resource
@@ -40,6 +43,29 @@ class CategoryResource extends Resource
                 ->rows(3)
                 ->columnSpanFull()
                 ->placeholder('Optional description'),
+
+            Toggle::make('is_dynamic_price')
+                ->label('Harga Dinamis (Kasir)')
+                ->helperText('Aktifkan jika produk di kategori ini meminta harga jual dinamis saat checkout di kasir.')
+                ->reactive()
+                ->default(false),
+
+            TextInput::make('profit_margin')
+                ->label('Margin Profit (%)')
+                ->helperText('Persentase keuntungan dari harga jual (misal: 25 untuk 25%).')
+                ->numeric()
+                ->default(0.0)
+                ->suffix('%')
+                ->visible(fn ($get) => $get('is_dynamic_price'))
+                ->required(fn ($get) => $get('is_dynamic_price')),
+
+            TagsInput::make('keywords')
+                ->label('Kata Kunci Pendeteksi Tambahan')
+                ->helperText('Masukkan kata kunci pencarian tambahan (misal: gelang, cincin) agar produk non-kategori ini juga terdeteksi sebagai harga dinamis.')
+                ->placeholder('Tambah kata kunci...')
+                ->separator(',')
+                ->visible(fn ($get) => $get('is_dynamic_price'))
+                ->columnSpanFull(),
         ])->columns(2);
     }
 
@@ -57,6 +83,16 @@ class CategoryResource extends Resource
                     ->limit(60)
                     ->toggleable()
                     ->searchable(),
+
+                IconColumn::make('is_dynamic_price')
+                    ->label('Harga Dinamis')
+                    ->boolean()
+                    ->sortable(),
+
+                TextColumn::make('profit_margin')
+                    ->label('Margin Profit')
+                    ->suffix('%')
+                    ->sortable(),
 
                 TextColumn::make('created_at')
                     ->label('Created')

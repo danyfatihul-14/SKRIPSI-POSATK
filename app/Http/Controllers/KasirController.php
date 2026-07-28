@@ -37,6 +37,7 @@ class KasirController extends Controller
 
         $query = Product::query()->with([
             'stockLevels' => fn($subQuery) => $subQuery->where('store_id', $storeId),
+            'category',
         ]);
 
         if ($storeId) {
@@ -52,17 +53,46 @@ class KasirController extends Controller
             });
         }
 
-        $products = $query->get()->map(function ($product) {
+        $dynamicCategories = \App\Models\Category::where('is_dynamic_price', true)->get();
+
+        $products = $query->get()->map(function ($product) use ($dynamicCategories) {
             $stockLevel = $product->stockLevels->first();
+
+            // Check if dynamic price
+            $isDynamic = false;
+            $catId = $product->category_id;
+            $prodName = $product->product_name;
+            $catName = $product->category?->category_name ?? '';
+
+            foreach ($dynamicCategories as $cat) {
+                if ($catId == $cat->category_id) {
+                    $isDynamic = true;
+                    break;
+                }
+                if (!empty($cat->keywords)) {
+                    $keywordsList = is_array($cat->keywords) ? $cat->keywords : json_decode($cat->keywords, true);
+                    if (!is_array($keywordsList)) {
+                        $keywordsList = array_map('trim', explode(',', $cat->keywords));
+                    }
+                    foreach ($keywordsList as $kw) {
+                        if ($kw !== '' && (stripos($prodName, $kw) !== false || stripos($catName, $kw) !== false)) {
+                            $isDynamic = true;
+                            break 2;
+                        }
+                    }
+                }
+            }
 
             return [
                 'product_id'    => $product->product_id,
                 'product_name'  => $product->product_name,
+                'category_name' => $product->category?->category_name ?? '',
                 'variant'       => $product->variant ?? '-',
                 'unit'          => $product->unit ?? '-',
                 'selling_price' => $product->selling_price ?? 0,
                 'stock'         => (int) ($stockLevel?->quantity ?? 0),
                 'image_url'     => $product->file_url ? asset('storage/' . $product->file_url) : null,
+                'is_dynamic_price' => $isDynamic,
             ];
         });
 
@@ -145,7 +175,16 @@ class KasirController extends Controller
         }
 
         try {
-            $items = $this->buildCartItems($cart);
+            $transactionId = $request->input('transaction_id');
+            $skipStockCheck = false;
+            if ($transactionId) {
+                $skipStockCheck = Transaction::query()
+                    ->where('transaction_id', $transactionId)
+                    ->where('status', 'pending_payment')
+                    ->exists();
+            }
+
+            $items = $this->buildCartItems($cart, null, $skipStockCheck);
 
             $subtotal = (int) round(collect($items)->sum('subtotal'));
             $qrisFee = (int) ceil($subtotal * 0.007);
@@ -244,7 +283,10 @@ class KasirController extends Controller
             }
         }
 
-        $transaction = DB::transaction(function () use ($request, $items, $subtotal, $payload) {
+        $cashPaid = $payload['payment_method'] === 'qris' ? $subtotal : $payment;
+        $cashChange = $payload['payment_method'] === 'qris' ? 0.00 : max(0.00, $payment - $subtotal);
+
+        $transaction = DB::transaction(function () use ($request, $items, $subtotal, $payload, $cashPaid, $cashChange) {
             $transaction = Transaction::create([
                 'store_id'       => $request->user()->store_id,
                 'user_id'        => $request->user()->user_id,
@@ -254,6 +296,8 @@ class KasirController extends Controller
                 'total_amount'   => $subtotal,
                 'status'         => 'completed',
                 'payment_method' => $payload['payment_method'],
+                'cash_paid'      => $cashPaid,
+                'cash_change'    => $cashChange,
                 'customer_type'  => 'walkin',
                 'customer_name'  => $request->input('customer_name') ?? 'Pelanggan Umum',
                 'notes'          => 'Transaksi dibayar oleh [' . $request->user()->name . ']',
@@ -311,12 +355,13 @@ class KasirController extends Controller
         return response()->json(['status' => 'success']);
     }
 
-    private function buildCartItems(array $rawCart, ?int $storeId = null): array
+    private function buildCartItems(array $rawCart, ?int $storeId = null, bool $skipStockCheck = false): array
     {
         $normalized = collect($rawCart)
             ->map(function ($row) {
                 return [
                     'product_id' => (int) ($row['product_id'] ?? $row['id'] ?? 0),
+                    'price'      => (float) ($row['price'] ?? 0),
                     'qty'        => (int) ($row['qty'] ?? 0),
                 ];
             })
@@ -330,12 +375,13 @@ class KasirController extends Controller
                 'stockLevels' => fn($q) => $storeId
                     ? $q->where('store_id', $storeId)
                     : $q,
+                'category',
             ])
             ->whereIn('product_id', $productIds)
             ->get()
             ->keyBy('product_id');
 
-        $items = $normalized->map(function ($row) use ($products) {
+        $items = $normalized->map(function ($row) use ($products, $skipStockCheck) {
             $product = $products->get($row['product_id']);
             if (! $product) {
                 return null;
@@ -349,13 +395,44 @@ class KasirController extends Controller
                 return null;
             }
 
-            if ($qty > $stock) {
+            if (! $skipStockCheck && $qty > $stock) {
                 throw ValidationException::withMessages([
                     'cart' => "Stok {$product->product_name} tidak cukup. Sisa stok: {$stock}.",
                 ]);
             }
 
-            $unitPrice = (float) ($product->selling_price ?? 0);
+            // Check if it is a dynamic price product (DB-driven)
+            $isDynamicPrice = false;
+            $catId = $product->category_id;
+            $prodName = $product->product_name;
+            $catName = $product->category?->category_name ?? '';
+
+            $dynamicCategories = \App\Models\Category::where('is_dynamic_price', true)->get();
+            foreach ($dynamicCategories as $cat) {
+                if ($catId == $cat->category_id) {
+                    $isDynamicPrice = true;
+                    break;
+                }
+                if (!empty($cat->keywords)) {
+                    $keywordsList = is_array($cat->keywords) ? $cat->keywords : json_decode($cat->keywords, true);
+                    if (!is_array($keywordsList)) {
+                        $keywordsList = array_map('trim', explode(',', $cat->keywords));
+                    }
+                    foreach ($keywordsList as $kw) {
+                        if ($kw !== '' && (stripos($prodName, $kw) !== false || stripos($catName, $kw) !== false)) {
+                            $isDynamicPrice = true;
+                            break 2;
+                        }
+                    }
+                }
+            }
+
+            if ($isDynamicPrice && $row['price'] > 0) {
+                $unitPrice = (float) $row['price'];
+            } else {
+                $unitPrice = (float) ($product->selling_price ?? 0);
+            }
+
             $discount = (float) ($stockLevel?->discount ?? 0);
             $subtotal = ($qty * $unitPrice) - $discount;
 
@@ -531,10 +608,15 @@ class KasirController extends Controller
             return response()->json(['message' => 'Nominal pembayaran kurang dari total belanja.'], 422);
         }
 
-        DB::transaction(function () use ($transaction, $payload, $request): void {
+        $cashPaid = $payload['payment_method'] === 'qris' ? $total : $payment;
+        $cashChange = $payload['payment_method'] === 'qris' ? 0.00 : max(0.00, $payment - $total);
+
+        DB::transaction(function () use ($transaction, $payload, $request, $cashPaid, $cashChange): void {
             $transaction->update([
                 'status' => 'completed',
                 'payment_method' => $payload['payment_method'],
+                'cash_paid' => $cashPaid,
+                'cash_change' => $cashChange,
                 'customer_name' => $payload['customer_name'] ?? $transaction->customer_name ?? 'Pelanggan Umum',
                 'notes' => trim(($transaction->notes ?? '') . ' | Dibayar [' . $request->user()->name . ']: ' . now()->format('Y-m-d H:i:s')),
             ]);
@@ -599,7 +681,7 @@ class KasirController extends Controller
         $storeId = $request->user()?->store_id;
 
         $query = Transaction::query()
-            ->with(['user:user_id,name'])
+            ->with(['user:user_id,name', 'items.product:product_id,product_name'])
             ->where('store_id', $storeId)
             ->where('status', 'completed');
 
@@ -624,6 +706,14 @@ class KasirController extends Controller
                     'customer_name' => $txn->customer_name ?? 'Pelanggan Umum',
                     'notes' => $txn->notes,
                     'receipt_url' => route('kasir.receipt', $txn->transaction_id),
+                    'items' => $txn->items->map(function ($item) {
+                        return [
+                            'product_name' => $item->product?->product_name ?? 'Produk',
+                            'quantity' => (int) $item->quantity,
+                            'unit_price' => (float) $item->unit_price,
+                            'subtotal' => (float) $item->subtotal,
+                        ];
+                    })->values()->all(),
                 ];
             });
 

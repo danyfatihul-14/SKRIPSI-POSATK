@@ -15,6 +15,15 @@ class Category extends Model
     protected $fillable = [
         'category_name',
         'description',
+        'is_dynamic_price',
+        'profit_margin',
+        'keywords',
+    ];
+
+    protected $casts = [
+        'is_dynamic_price' => 'boolean',
+        'profit_margin' => 'float',
+        'keywords' => 'array',
     ];
 
     public function products(): HasMany

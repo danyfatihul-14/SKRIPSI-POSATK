@@ -26,6 +26,8 @@ class Transaction extends Model
         'payment_method',
         'customer_type',
         'notes',
+        'cash_paid',
+        'cash_change',
     ];
 
     protected $casts = [
@@ -33,6 +35,8 @@ class Transaction extends Model
         'tax' => 'decimal:2',
         'discount' => 'decimal:2',
         'total_amount' => 'decimal:2',
+        'cash_paid' => 'decimal:2',
+        'cash_change' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
