@@ -21,13 +21,16 @@ class EditProduct extends EditRecord
         $this->oldFileUrl = $this->record->file_url;
 
         // Load stok dari toko pertama yang ada
-        $stockLevel = StockLevel::where('product_id', $this->record->product_id)
-            ->first();
+        $stockLevel = StockLevel::where('product_id', $this->record->product_id)->first();
 
         if ($stockLevel) {
             $data['initial_store_id'] = $stockLevel->store_id;
             $data['initial_stock'] = $stockLevel->quantity;
             $data['initial_discount'] = $stockLevel->discount;
+        } else {
+            $data['initial_store_id'] = \App\Models\Store::query()->value('store_id');
+            $data['initial_stock'] = 0;
+            $data['initial_discount'] = 0;
         }
 
         return $data;
@@ -45,25 +48,23 @@ class EditProduct extends EditRecord
             }
         }
 
-        $storeId = $this->data['initial_store_id'] ?? null;
-        $stock = $this->data['initial_stock'] ?? null;
+        $storeId = $this->data['initial_store_id'] ?? \App\Models\Store::query()->value('store_id');
+        $stock = $this->data['initial_stock'] ?? 0;
         $discount = $this->data['initial_discount'] ?? 0;
 
-        if (!$storeId || $stock === null) {
-            return;
+        if ($storeId) {
+            StockLevel::updateOrCreate(
+                [
+                    'store_id'   => (int) $storeId,
+                    'product_id' => $this->record->product_id,
+                ],
+                [
+                    'quantity'   => max(0, (int) $stock),
+                    'unit_price' => (float) $this->record->selling_price,
+                    'discount'   => max(0, (float) $discount),
+                ]
+            );
         }
-
-        StockLevel::updateOrCreate(
-            [
-                'store_id'   => (int) $storeId,
-                'product_id' => $this->record->product_id,
-            ],
-            [
-                'quantity'   => max(0, (int) $stock),
-                'unit_price' => (float) $this->record->selling_price,
-                'discount'   => max(0, (float) $discount),
-            ]
-        );
 
         Notification::make()
             ->success()

@@ -163,8 +163,9 @@
                     ? `${prod.product_name} (${vName})` 
                     : prod.product_name;
                 
+                const isDynamic = isDynamicPriceProduct(prod);
                 const availableStock = Math.max(0, (prod.stock ?? 0) - getCartQty(prod.product_id) - getHeldQty(prod.product_id));
-                const isOutOfStock = availableStock <= 0;
+                const isOutOfStock = !isDynamic && availableStock <= 0;
 
                 return `
                 <div class="product-card"
@@ -176,8 +177,8 @@
                             ? `<img src="${prod.image_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`
                             : `<div style="width:100%;height:100%;">${noImageHTML(prod.product_name)}</div>`}
 
-                        <div style="position:absolute; top:8px; right:8px; background:${isOutOfStock ? '#ef4444' : '#111827'}; color:white; font-size:11px; padding:4px 8px; border-radius:6px; font-weight: 600;">
-                            Stok: ${availableStock}
+                        <div style="position:absolute; top:8px; right:8px; background:${isOutOfStock ? '#ef4444' : (isDynamic ? '#2563eb' : '#111827')}; color:white; font-size:11px; padding:4px 8px; border-radius:6px; font-weight: 600;">
+                            Stok: ${isDynamic ? 'Dinamis' : availableStock}
                         </div>
 
                         ${prod.discount ? `
@@ -210,8 +211,9 @@
                 </div>`;
             } else {
                 const firstProd = group[0];
+                const isDynamicGroup = group.some(p => isDynamicPriceProduct(p));
                 const totalAvailableStock = group.reduce((s, p) => s + Math.max(0, (p.stock ?? 0) - getCartQty(p.product_id) - getHeldQty(p.product_id)), 0);
-                const isOutOfStock = totalAvailableStock <= 0;
+                const isOutOfStock = !isDynamicGroup && totalAvailableStock <= 0;
                 
                 const prices = group.map(p => parseFloat(p.selling_price));
                 const minPrice = Math.min(...prices);
@@ -233,8 +235,8 @@
                             ? `<img src="${firstProd.image_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`
                             : `<div style="width:100%;height:100%;">${noImageHTML(firstProd.product_name)}</div>`}
 
-                        <div style="position:absolute; top:8px; right:8px; background:${isOutOfStock ? '#ef4444' : '#15173D'}; color:white; font-size:11px; padding:4px 8px; border-radius:6px; font-weight:600;">
-                            Total Stok: ${totalAvailableStock}
+                        <div style="position:absolute; top:8px; right:8px; background:${isOutOfStock ? '#ef4444' : (isDynamicGroup ? '#2563eb' : '#15173D')}; color:white; font-size:11px; padding:4px 8px; border-radius:6px; font-weight:600;">
+                            Total Stok: ${isDynamicGroup ? 'Dinamis' : totalAvailableStock}
                         </div>
 
                         <div style="position:absolute; bottom:8px; left:8px; background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; border:1px solid #bae6fd;">
@@ -272,13 +274,12 @@
         const prod = products.find(p => p.product_id == id);
         if (!prod) return;
 
-        const availableStock = Math.max(0, (prod.stock ?? 0) - getCartQty(id) - getHeldQty(id));
-        if (availableStock <= 0) {
+        const isDynamic = isDynamicPriceProduct(prod);
+        const availableStock = isDynamic ? 99999 : Math.max(0, (prod.stock ?? 0) - getCartQty(id) - getHeldQty(id));
+        if (!isDynamic && availableStock <= 0) {
             window.showAlert('Stok tidak mencukupi!', 'warning');
             return;
         }
-
-        const isDynamic = isDynamicPriceProduct(prod);
 
         if (isDynamic) {
             const promptTitle = 'Input Harga Jual';
@@ -299,7 +300,8 @@
                 cancelText: 'Batal',
                 showCancel: true,
                 onOk: () => {
-                    const priceVal = parseFloat(document.getElementById(inputId).value) || 0;
+                    const inp = document.getElementById(inputId);
+                    const priceVal = parseFloat(inp?.value || 0);
                     if (priceVal <= 0) {
                         window.showAlert('Harga jual tidak boleh kosong atau kurang dari sama dengan 0.', 'warning');
                         return;
@@ -325,6 +327,8 @@
         const prod = products.find(p => p.product_id == id);
         if (!prod) return;
 
+        const isDynamic = isDynamicPriceProduct(prod);
+
         let idx = cart.findIndex(i => i.id == id && i.price == parseFloat(price));
         if (idx >= 0) {
             cart[idx].qty++;
@@ -334,7 +338,7 @@
                 name,
                 price: parseFloat(price),
                 qty: 1,
-                maxStock: parseInt(prod.stock ?? 0)
+                maxStock: isDynamic ? 99999 : parseInt(prod.stock ?? 0)
             });
         }
 

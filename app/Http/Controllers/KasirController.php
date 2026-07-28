@@ -395,12 +395,6 @@ class KasirController extends Controller
                 return null;
             }
 
-            if (! $skipStockCheck && $qty > $stock) {
-                throw ValidationException::withMessages([
-                    'cart' => "Stok {$product->product_name} tidak cukup. Sisa stok: {$stock}.",
-                ]);
-            }
-
             // Check if it is a dynamic price product (DB-driven)
             $isDynamicPrice = false;
             $catId = $product->category_id;
@@ -425,6 +419,12 @@ class KasirController extends Controller
                         }
                     }
                 }
+            }
+
+            if (! $skipStockCheck && ! $isDynamicPrice && $qty > $stock) {
+                throw ValidationException::withMessages([
+                    'cart' => "Stok {$product->product_name} tidak cukup. Sisa stok: {$stock}.",
+                ]);
             }
 
             if ($isDynamicPrice && $row['price'] > 0) {

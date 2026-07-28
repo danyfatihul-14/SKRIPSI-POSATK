@@ -76,6 +76,21 @@ class Product extends Model
             }
         });
 
+        static::deleting(function (Product $product): void {
+            \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+
+            TransactionItem::query()->where('product_id', $product->product_id)->delete();
+            StockLevel::query()->where('product_id', $product->product_id)->delete();
+            if (class_exists(StockLog::class)) {
+                StockLog::query()->where('product_id', $product->product_id)->delete();
+            }
+            if (class_exists(MlPrediction::class)) {
+                MlPrediction::query()->where('product_id', $product->product_id)->delete();
+            }
+
+            \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+        });
+
         static::deleted(function (Product $product): void {
             if (empty($product->file_url)) {
                 return;

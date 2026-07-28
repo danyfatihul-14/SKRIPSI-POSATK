@@ -24,6 +24,11 @@ class ProductCatalog extends Page
     public array $stores = [];
     public $products = [];
     public $search = '';
+    public string $missingFilter = ''; // '' | 'incomplete' | 'no_image' | 'no_category' | 'no_purchase_price'
+    public int $countNoImage = 0;
+    public int $countNoCategory = 0;
+    public int $countNoPurchasePrice = 0;
+    public int $countIncomplete = 0;
 
     protected function getHeaderActions(): array
     {
@@ -41,6 +46,11 @@ class ProductCatalog extends Page
         $this->loadProducts();
     }
 
+    public function updatedMissingFilter(): void
+    {
+        $this->loadProducts();
+    }
+
     public function mount(): void
     {
         // Ambil list store untuk dropdown filter
@@ -53,6 +63,30 @@ class ProductCatalog extends Page
 
     public function loadProducts(): void
     {
+        $baseQuery = \App\Models\Product::query()->with('category');
+        if ($this->storeId) {
+            $baseQuery->whereHas('stockLevels', function ($q) {
+                $q->where('store_id', $this->storeId);
+            });
+        }
+
+        $allProds = $baseQuery->get();
+        $this->countNoImage = $allProds->filter(fn($p) => empty($p->file_url))->count();
+        $this->countNoCategory = $allProds->filter(fn($p) => empty($p->category_id))->count();
+        $this->countNoPurchasePrice = $allProds->filter(function ($p) {
+            $isDynamic = (bool) ($p->category?->is_dynamic_price ?? false);
+            return ! $isDynamic && (empty($p->purchase_price) || $p->purchase_price <= 0);
+        })->count();
+
+        $this->countIncomplete = $allProds->filter(function ($p) {
+            $isDynamic = (bool) ($p->category?->is_dynamic_price ?? false);
+            $hasNoImage = empty($p->file_url);
+            $hasNoCategory = empty($p->category_id);
+            $hasNoPurchasePrice = ! $isDynamic && (empty($p->purchase_price) || $p->purchase_price <= 0);
+
+            return $hasNoImage || $hasNoCategory || $hasNoPurchasePrice;
+        })->count();
+
         $query = \App\Models\Product::query()
             ->with(['category', 'stockLevels' => function ($q) {
                 if ($this->storeId) {
@@ -75,19 +109,64 @@ class ProductCatalog extends Page
             });
         }
 
+        if ($this->missingFilter === 'no_image') {
+            $query->where(function ($q) {
+                $q->whereNull('file_url')->orWhere('file_url', '');
+            });
+        } elseif ($this->missingFilter === 'no_category') {
+            $query->whereNull('category_id');
+        } elseif ($this->missingFilter === 'no_purchase_price') {
+            $query->where(function ($q) {
+                $q->whereNull('purchase_price')->orWhere('purchase_price', '<=', 0);
+            })->where(function ($q) {
+                $q->whereHas('category', function ($cat) {
+                    $cat->where('is_dynamic_price', false);
+                })->orWhereNull('category_id');
+            });
+        } elseif ($this->missingFilter === 'incomplete') {
+            $query->where(function ($q) {
+                $q->whereNull('file_url')
+                  ->orWhere('file_url', '')
+                  ->orWhereNull('category_id')
+                  ->orWhere(function ($sub) {
+                      $sub->where(function ($pPrice) {
+                          $pPrice->whereNull('purchase_price')->orWhere('purchase_price', '<=', 0);
+                      })->whereHas('category', function ($cat) {
+                          $cat->where('is_dynamic_price', false);
+                      });
+                  });
+            });
+        }
+
         $this->products = $query->get()->map(function ($product) {
             $stockLevel = $product->stockLevels->first();
+            $isDynamic = (bool) ($product->category?->is_dynamic_price ?? false);
+
+            $missing = [];
+            if (empty($product->file_url)) {
+                $missing[] = 'Tanpa Gambar';
+            }
+            if (empty($product->category_id)) {
+                $missing[] = 'Tanpa Kategori';
+            }
+            if (! $isDynamic && (empty($product->purchase_price) || $product->purchase_price <= 0)) {
+                $missing[] = 'Tanpa Harga Beli';
+            }
 
             return [
                 'product_id'     => $product->product_id,
                 'product_name'   => $product->product_name,
                 'variant'        => $product->variant ?: '-',
                 'unit'           => $product->unit ?? '-',
-                'category_name'  => $product->category?->category_name ?? '-',
+                'category_name'  => $product->category?->category_name ?? null,
+                'category_id'    => $product->category_id,
+                'is_dynamic'     => $isDynamic,
                 'file_url'       => $product->file_url,
+                'purchase_price' => (float) ($product->purchase_price ?? 0),
                 'selling_price'  => (float) ($product->selling_price ?? 0),
                 'stock'          => (int) ($stockLevel?->quantity ?? 0),
                 'discount'       => (float) ($stockLevel?->discount ?? 0),
+                'missing'        => $missing,
             ];
         })->toArray();
     }
@@ -103,7 +182,9 @@ class ProductCatalog extends Page
 
         $imagePath = $product->file_url;
 
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
         $product->delete();
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
 
         // hapus file jika tidak dipakai produk lain
         if (! empty($imagePath)) {

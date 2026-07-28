@@ -33,7 +33,8 @@ class ProductResource extends Resource
                 ->label('Kategori')
                 ->relationship('category', 'category_name')
                 ->searchable()
-                ->preload(),
+                ->preload()
+                ->live(),
 
             Forms\Components\FileUpload::make('file_url')
                 ->label('Foto Produk')
@@ -95,7 +96,6 @@ class ProductResource extends Resource
                 ->options(fn() => Store::query()->pluck('name_store', 'store_id'))
                 ->searchable()
                 ->required(fn(string $operation) => $operation === 'create')
-                ->visible(fn(string $operation) => $operation === 'create')
                 ->dehydrated(true),
 
             // Dipakai saat CREATE (multi baris)
@@ -116,13 +116,17 @@ class ProductResource extends Resource
                         ->label('Harga Beli')
                         ->numeric()
                         ->prefix('Rp')
-                        ->required(),
+                        ->default(0)
+                        ->nullable()
+                        ->placeholder('0 (opsional untuk harga dinamis)'),
 
                     Forms\Components\TextInput::make('selling_price')
                         ->label('Harga Jual')
                         ->numeric()
                         ->prefix('Rp')
-                        ->required(),
+                        ->default(0)
+                        ->nullable()
+                        ->placeholder('0 (opsional untuk harga dinamis)'),
 
                     Forms\Components\Select::make('unit')
                         ->label('Satuan')
@@ -150,7 +154,8 @@ class ProductResource extends Resource
                         ->numeric()
                         ->minValue(0)
                         ->default(0)
-                        ->required(),
+                        ->nullable()
+                        ->placeholder('0 (opsional)'),
 
                     Forms\Components\TextInput::make('initial_discount')
                         ->label('Diskon Awal')
@@ -164,14 +169,16 @@ class ProductResource extends Resource
                 ->label('Harga Beli')
                 ->numeric()
                 ->prefix('Rp')
-                ->required(fn(string $operation) => $operation === 'edit')
+                ->default(0)
+                ->nullable()
                 ->visible(fn(string $operation) => $operation === 'edit'),
 
             Forms\Components\TextInput::make('selling_price')
                 ->label('Harga Jual')
                 ->numeric()
                 ->prefix('Rp')
-                ->required(fn(string $operation) => $operation === 'edit')
+                ->default(0)
+                ->nullable()
                 ->visible(fn(string $operation) => $operation === 'edit'),
 
             Forms\Components\Select::make('unit')
@@ -194,6 +201,22 @@ class ProductResource extends Resource
                 ->label('Varian Isi')
                 ->placeholder('contoh: 50 lembar')
                 ->maxLength(100)
+                ->visible(fn(string $operation) => $operation === 'edit'),
+
+            Forms\Components\TextInput::make('initial_stock')
+                ->label('Jumlah Stok')
+                ->numeric()
+                ->minValue(0)
+                ->default(0)
+                ->nullable()
+                ->visible(fn(string $operation) => $operation === 'edit'),
+
+            Forms\Components\TextInput::make('initial_discount')
+                ->label('Diskon (%)')
+                ->numeric()
+                ->minValue(0)
+                ->default(0)
+                ->nullable()
                 ->visible(fn(string $operation) => $operation === 'edit'),
         ]);
     }

@@ -154,12 +154,62 @@
         .btn-delete:hover {
             background: #dc2626;
         }
+
+        .warning-badge {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fca5a5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .incomplete-callout {
+            background: #fffbebf5;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
     </style>
 
-    <div class="space-y-2">
+    <div class="space-y-3">
+        {{-- Notification Banner for Incomplete Data --}}
+        @if($countIncomplete > 0)
+        <div class="incomplete-callout">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">⚠️</span>
+                <div>
+                    <strong>Pemberitahuan Data Produk Inkomplit:</strong>
+                    Terdapat <strong>{{ $countIncomplete }}</strong> produk belum lengkap 
+                    (<span>📷 {{ $countNoImage }} tanpa gambar</span>, 
+                    <span>🏷️ {{ $countNoCategory }} tanpa kategori</span>, 
+                    <span>💰 {{ $countNoPurchasePrice }} tanpa harga beli</span>).
+                </div>
+            </div>
+            @if(empty($missingFilter))
+            <button wire:click="$set('missingFilter', 'incomplete')" style="background: #d97706; color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;">
+                Tampilkan Produk Inkomplit
+            </button>
+            @else
+            <button wire:click="$set('missingFilter', '')" style="background: #4b5563; color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;">
+                Lihat Semua Produk
+            </button>
+            @endif
+        </div>
+        @endif
+
         {{-- Filters & Search --}}
         <div class="flex gap-2 items-center flex-wrap">
-            <x-filament::input.wrapper class="w-48">
+            <x-filament::input.wrapper class="w-44">
                 <x-filament::input.select wire:model.live="storeId" class="text-xs">
                     @foreach($stores as $id => $name)
                         <option value="{{ $id }}">{{ $name }}</option>
@@ -167,7 +217,17 @@
                 </x-filament::input.select>
             </x-filament::input.wrapper>
 
-            <x-filament::input.wrapper class="flex-1 min-w-[200px]">
+            <x-filament::input.wrapper class="w-64">
+                <x-filament::input.select wire:model.live="missingFilter" class="text-xs">
+                    <option value="">Semua Data Produk</option>
+                    <option value="incomplete">⚠️ Semua Data Inkomplit ({{ $countIncomplete }})</option>
+                    <option value="no_image">📷 Tanpa Gambar ({{ $countNoImage }})</option>
+                    <option value="no_category">🏷️ Tanpa Kategori ({{ $countNoCategory }})</option>
+                    <option value="no_purchase_price">💰 Tanpa Harga Beli ({{ $countNoPurchasePrice }})</option>
+                </x-filament::input.select>
+            </x-filament::input.wrapper>
+
+            <x-filament::input.wrapper class="flex-1 min-w-[180px]">
                 <x-filament::input
                     type="text"
                     wire:model.live="search"
@@ -210,6 +270,15 @@
                     @endif
                 </div>
 
+                {{-- Incomplete Warning Badges --}}
+                @if(!empty($product['missing']))
+                <div style="display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px;">
+                    @foreach($product['missing'] as $tag)
+                        <span class="warning-badge">⚠️ {{ $tag }}</span>
+                    @endforeach
+                </div>
+                @endif
+
                 {{-- Info --}}
                 <h3 class="product-title">{{ $product['product_name'] }}</h3>
 
@@ -221,11 +290,24 @@
                     Satuan: {{ $product['unit'] ?? '-' }}
                 </p>
 
-                <p class="product-category" style="font-size:10px;">{{ $product['category_name'] ?? '-' }}</p>
+                <p class="product-category" style="font-size:10px; color: {{ empty($product['category_id']) ? '#dc2626; font-weight:700;' : '#64748b;' }}">
+                    Kategori: {{ $product['category_name'] ?? 'Belum ada' }}
+                </p>
 
                 <div class="product-info">
                     <div class="product-info-row">
-                        <span class="product-label">Harga:</span>
+                        <span class="product-label">Hrg Beli:</span>
+                        @if(!empty($product['is_dynamic']))
+                            <span class="product-value" style="color: #2563eb; font-weight: 700;">Dinamis</span>
+                        @else
+                            <span class="product-value" style="{{ $product['purchase_price'] <= 0 ? 'color: #dc2626; font-weight: 700;' : '' }}">
+                                {{ $product['purchase_price'] > 0 ? 'Rp ' . number_format($product['purchase_price'], 0, ',', '.') : 'Belum diisi' }}
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="product-info-row">
+                        <span class="product-label">Hrg Jual:</span>
                         <span class="product-value">Rp {{ number_format($product['selling_price'], 0, ',', '.') }}</span>
                     </div>
 
