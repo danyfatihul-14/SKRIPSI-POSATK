@@ -508,7 +508,7 @@
 
 <!-- Modal Tambah Produk Baru -->
 <div id="addProductModal" class="variant-modal hidden">
-    <div class="variant-modal__backdrop" onclick="closeAddProductModal()"></div>
+    <div class="variant-modal__backdrop"></div>
     <div class="variant-modal__dialog">
         <div class="variant-modal__header">
             <h5 class="variant-modal__title">Tambah Produk Baru</h5>

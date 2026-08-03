@@ -160,7 +160,7 @@ class KasirController extends Controller
 
     public function generateQris(Request $request)
     {
-        abort_unless($request->user()?->role === 'cashier', 403);
+        abort_unless(in_array($request->user()?->role, ['cashier', 'pelayan'], true), 403);
 
         $request->validate([
             'cart' => ['required', 'string'],
@@ -251,7 +251,7 @@ class KasirController extends Controller
 
     public function checkout(Request $request)
     {
-        abort_unless($request->user()?->role === 'cashier', 403);
+        abort_unless(in_array($request->user()?->role, ['cashier', 'pelayan'], true), 403);
 
         $payload = $request->validate([
             'cart' => ['required', 'string'],
@@ -550,7 +550,7 @@ class KasirController extends Controller
     // Existing methods (pendingList, payPending, dll) tetap sama...
     public function pendingList(Request $request)
     {
-        abort_unless($request->user()?->role === 'cashier', 403);
+        abort_unless(in_array($request->user()?->role, ['cashier', 'pelayan'], true), 403);
 
         $storeId = $request->user()?->store_id;
 
@@ -589,7 +589,7 @@ class KasirController extends Controller
 
     public function payPending(Request $request, Transaction $transaction)
     {
-        abort_unless($request->user()?->role === 'cashier', 403);
+        abort_unless(in_array($request->user()?->role, ['cashier', 'pelayan'], true), 403);
 
         if ($transaction->status !== 'pending_payment') {
             return response()->json(['message' => 'Transaksi bukan pending payment.'], 422);
@@ -618,7 +618,7 @@ class KasirController extends Controller
                 'cash_paid' => $cashPaid,
                 'cash_change' => $cashChange,
                 'customer_name' => $payload['customer_name'] ?? $transaction->customer_name ?? 'Pelanggan Umum',
-                'notes' => trim(($transaction->notes ?? '') . ' | Dibayar [' . $request->user()->name . ']: ' . now()->format('Y-m-d H:i:s')),
+                'notes' => trim(($transaction->notes ?? '') . ' | Dibayar [' . $request->user()->name . ']: ' . now('Asia/Jakarta')->format('Y-m-d H:i:s')),
             ]);
         });
 
@@ -632,7 +632,7 @@ class KasirController extends Controller
 
     public function deletePending(Request $request, Transaction $transaction)
     {
-        abort_unless($request->user()?->role === 'cashier', 403);
+        abort_unless(in_array($request->user()?->role, ['cashier', 'pelayan'], true), 403);
 
         if ($transaction->status !== 'pending_payment') {
             return response()->json([

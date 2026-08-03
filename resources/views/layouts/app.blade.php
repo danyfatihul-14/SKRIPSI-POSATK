@@ -14,7 +14,10 @@
         <div class="font-bold text-xl">TOKO INTAN</div>
         <div>
             <span class="mr-4">Kasir</span>
-            <a href="/logout" class="text-red-600 font-semibold">Logout</a>
+            <form method="POST" action="{{ route('logout') }}" style="display:inline;">
+                @csrf
+                <button type="submit" class="text-red-600 font-semibold" style="background:none;border:none;cursor:pointer;">Logout</button>
+            </form>
         </div>
     </nav>
     <div class="flex">
