@@ -202,10 +202,16 @@
 
                         <div style="font-size:14px; font-weight:700; color:var(--accent); display: flex; justify-content: space-between; align-items: center;">
                             <span>Rp${parseInt(prod.selling_price).toLocaleString('id-ID')}</span>
-                            <button onclick="event.stopPropagation(); printProductQr('${prod.product_id}', '${prod.product_name.replace(/'/g,"\\'")}', '${(prod.variant || '-').replace(/'/g,"\\'")}')" style="background: #8b5cf6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 12px; height: 12px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
-                                QR
-                            </button>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                ${!prod.image_url ? `
+                                <button onclick="event.stopPropagation(); openEditImageModal('${prod.product_id}', '${prod.product_name.replace(/'/g,"\\'")}')" style="background: #0284c7; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; height: 24px; line-height: 1;" title="Ambil Foto Produk">
+                                    📷 Foto
+                                </button>` : ''}
+                                <button onclick="event.stopPropagation(); printProductQr('${prod.product_id}', '${prod.product_name.replace(/'/g,"\\'")}', '${(prod.variant || '-').replace(/'/g,"\\'")}')" style="background: #8b5cf6; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; height: 24px; line-height: 1;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 10px; height: 10px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
+                                    QR
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>`;
@@ -214,6 +220,7 @@
                 const isDynamicGroup = group.some(p => isDynamicPriceProduct(p));
                 const totalAvailableStock = group.reduce((s, p) => s + Math.max(0, (p.stock ?? 0) - getCartQty(p.product_id) - getHeldQty(p.product_id)), 0);
                 const isOutOfStock = !isDynamicGroup && totalAvailableStock <= 0;
+                const hasAnyGroupImage = group.some(p => !!p.image_url);
                 
                 const prices = group.map(p => parseFloat(p.selling_price));
                 const minPrice = Math.min(...prices);
@@ -257,8 +264,18 @@
                             Satuan: ${firstProd.unit}
                         </div>
 
-                        <div style="font-size:14px; font-weight:700; color:var(--accent);">
-                            ${priceText}
+                        <div style="font-size:14px; font-weight:700; color:var(--accent); display: flex; justify-content: space-between; align-items: center;">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%;">${priceText}</span>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                ${!hasAnyGroupImage ? `
+                                <button onclick="event.stopPropagation(); openEditImageModal('${firstProd.product_id}', '${firstProd.product_name.replace(/'/g,"\\'")}')" style="background: #0284c7; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; height: 24px; line-height: 1;" title="Ambil Foto Produk">
+                                    📷 Foto
+                                </button>` : ''}
+                                <button onclick="event.stopPropagation(); printProductQr('${firstProd.product_id}', '${firstProd.product_name.replace(/'/g,"\\'")}', '${(firstProd.variant || '-').replace(/'/g,"\\'")}')" style="background: #8b5cf6; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; height: 24px; line-height: 1;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 10px; height: 10px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
+                                    QR
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>`;
@@ -270,7 +287,13 @@
         return prod && !!prod.is_dynamic_price;
     }
 
+    let lastAddCartTime = 0;
+
     function addCart(id, name, price, btn = null) {
+        const now = Date.now();
+        if (now - lastAddCartTime < 180) return;
+        lastAddCartTime = now;
+
         const prod = products.find(p => p.product_id == id);
         if (!prod) return;
 
@@ -636,8 +659,8 @@
                                   .sort((a, b) => parseFloat(a.selling_price || 0) - parseFloat(b.selling_price || 0));
         if (currentVariants.length === 0) return;
 
-        // Select the first variant that has available stock > 0, otherwise select the first variant
-        const firstAvailable = currentVariants.find(v => ((v.stock ?? 0) - getCartQty(v.product_id) - getHeldQty(v.product_id)) > 0);
+        // Select the first variant that has available stock > 0 or is dynamic price, otherwise select the first variant
+        const firstAvailable = currentVariants.find(v => isDynamicPriceProduct(v) || ((v.stock ?? 0) - getCartQty(v.product_id) - getHeldQty(v.product_id)) > 0);
         if (firstAvailable) {
             selectedVariantId = firstAvailable.product_id;
         } else {
@@ -666,10 +689,12 @@
             const badgeStyle = isSelected ? 'display: flex;' : 'display: none;';
             const price = parseFloat(v.selling_price).toLocaleString('id-ID');
             const variantName = getVariantDisplayName(v);
-            const availableStock = Math.max(0, (v.stock ?? 0) - getCartQty(v.product_id) - getHeldQty(v.product_id));
-            const isOutOfStock = availableStock <= 0;
+            const isDynamic = isDynamicPriceProduct(v);
+            const availableStock = isDynamic ? 99999 : Math.max(0, (v.stock ?? 0) - getCartQty(v.product_id) - getHeldQty(v.product_id));
+            const isOutOfStock = !isDynamic && availableStock <= 0;
             const cardOpacity = isOutOfStock ? 'opacity: 0.55;' : '';
             const cardCursor = isOutOfStock ? 'cursor: not-allowed;' : 'cursor: pointer;';
+            const stockDisplay = isDynamic ? 'Dinamis' : availableStock;
 
             return `
             <div class="variant-option-card" style="padding: 12px; border-radius: 8px; transition: all 0.2s; position: relative; ${borderStyle} ${cardOpacity} ${cardCursor}" onclick="${isOutOfStock ? '' : `selectVariant('${v.product_id}')`}">
@@ -677,12 +702,18 @@
                 <div style="font-weight: 700; font-size: 13px; color: var(--dark);">${variantName}</div>
                 <div style="font-size: 12px; color: var(--dark-light); margin-top: 4px;">Rp${price}</div>
                 <div style="font-size: 11px; color: ${isOutOfStock ? '#ef4444' : '#64748b'}; margin-top: 2px; font-weight: ${isOutOfStock ? '700' : 'normal'};">
-                    Stok: ${availableStock} ${isOutOfStock ? '(Habis)' : ''}
+                    Stok: ${stockDisplay} ${isOutOfStock ? '(Habis)' : ''}
                 </div>
-                <button type="button" onclick="event.stopPropagation(); printProductQr('${v.product_id}', '${v.product_name.replace(/'/g,"\\'")}', '${(v.variant || '-').replace(/'/g,"\\'")}')" style="position: absolute; bottom: 8px; right: 8px; background: #8b5cf6; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; z-index: 50;">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 10px; height: 10px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
-                    QR
-                </button>
+                <div style="position: absolute; bottom: 8px; right: 8px; display: flex; gap: 4px; z-index: 50;">
+                    ${!v.image_url ? `
+                    <button type="button" onclick="event.stopPropagation(); openEditImageModal('${v.product_id}', '${v.product_name.replace(/'/g,"\\'")}')" style="background: #0284c7; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;" title="Ambil Foto Produk">
+                        📷 Foto
+                    </button>` : ''}
+                    <button type="button" onclick="event.stopPropagation(); printProductQr('${v.product_id}', '${v.product_name.replace(/'/g,"\\'")}', '${(v.variant || '-').replace(/'/g,"\\'")}')" style="background: #8b5cf6; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 10px; height: 10px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 15h.008v.008H15V15zm0 2.25h.008v.008H15v-.008zM17.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zM15 19.5h.008v.008H15V19.5zm0-2.25h.008v.008H15v-.008zm2.25 0h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V19.5z" /></svg>
+                        QR
+                    </button>
+                </div>
             </div>
             `;
         }).join('');
@@ -703,9 +734,10 @@
 
         const qtyInput = document.getElementById('variantQtyInput');
         const qty = qtyInput ? parseInt(qtyInput.value) : 1;
-        const availableStock = Math.max(0, (activeVar.stock ?? 0) - getCartQty(activeVar.product_id) - getHeldQty(activeVar.product_id));
+        const isDynamic = isDynamicPriceProduct(activeVar);
+        const availableStock = isDynamic ? 99999 : Math.max(0, (activeVar.stock ?? 0) - getCartQty(activeVar.product_id) - getHeldQty(activeVar.product_id));
 
-        if (availableStock <= 0) {
+        if (!isDynamic && availableStock <= 0) {
             btn.disabled = true;
             btn.style.opacity = '0.5';
             btn.innerText = 'Stok Habis';
@@ -713,7 +745,7 @@
                 warningEl.innerText = 'Stok tidak mencukupi!';
                 warningEl.style.display = 'block';
             }
-        } else if (qty > availableStock) {
+        } else if (!isDynamic && qty > availableStock) {
             btn.disabled = true;
             btn.style.opacity = '0.5';
             btn.innerText = 'Stok Kurang';
@@ -748,9 +780,10 @@
 
         const qtyInput = document.getElementById('variantQtyInput');
         const qty = qtyInput ? parseInt(qtyInput.value) : 1;
-        const availableStock = Math.max(0, (activeVar.stock ?? 0) - getCartQty(activeVar.product_id) - getHeldQty(activeVar.product_id));
+        const isDynamic = isDynamicPriceProduct(activeVar);
+        const availableStock = isDynamic ? 99999 : Math.max(0, (activeVar.stock ?? 0) - getCartQty(activeVar.product_id) - getHeldQty(activeVar.product_id));
 
-        if (qty > availableStock) {
+        if (!isDynamic && qty > availableStock) {
             window.showAlert('Stok tidak mencukupi.', 'warning');
             return;
         }
@@ -759,8 +792,6 @@
         const displayName = vName !== 'Default' 
             ? `${activeVar.product_name} (${vName})` 
             : activeVar.product_name;
-
-        const isDynamic = isDynamicPriceProduct(activeVar);
 
         if (isDynamic) {
             const promptTitle = 'Input Harga Jual';
@@ -806,6 +837,8 @@
     }
 
     function addCartWithQty(id, name, price, qty, maxStock) {
+        const prod = products.find(p => p.product_id == id);
+        const isDynamic = isDynamicPriceProduct(prod);
         let idx = cart.findIndex(i => i.id == id && i.price == parseFloat(price));
         if (idx >= 0) {
             cart[idx].qty += qty;
@@ -815,7 +848,7 @@
                 name,
                 price: parseFloat(price),
                 qty: qty,
-                maxStock: parseInt(maxStock ?? 0)
+                maxStock: isDynamic ? 99999 : parseInt(maxStock ?? 0)
             });
         }
         updateCartBadge();
@@ -1292,7 +1325,351 @@
         printWindow.document.close();
     };
 
+    let editImageCamStream = null;
+    let capturedBase64Image = null;
+    let currentEditTab = 'file';
+    let currentCameraFacingMode = 'environment';
+
+    window.openEditImageModal = function(productId, productName) {
+        const pIdInput = document.getElementById('editImageProductId');
+        const pTitle = document.getElementById('editImageModalTitle');
+        if (pIdInput) pIdInput.value = productId;
+        if (pTitle) pTitle.innerText = `Ganti Foto: ${productName}`;
+
+        const fileInput = document.getElementById('editImageFileInput');
+        if (fileInput) fileInput.value = '';
+        
+        const previewContainer = document.getElementById('editImagePreviewContainer');
+        if (previewContainer) previewContainer.style.display = 'none';
+        
+        capturedBase64Image = null;
+        switchEditImageTab('file');
+
+        const modal = document.getElementById('editProductImageModal');
+        if (modal) modal.style.display = 'flex';
+    };
+
+    window.closeEditProductImageModal = function() {
+        stopEditImageCamera();
+        const modal = document.getElementById('editProductImageModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.switchEditImageTab = function(tab) {
+        currentEditTab = tab;
+        const tabFile = document.getElementById('tabUploadFile');
+        const tabCam = document.getElementById('tabUseCamera');
+        const secFile = document.getElementById('editImageFileSection');
+        const secCam = document.getElementById('editImageCameraSection');
+
+        if (tab === 'file') {
+            stopEditImageCamera();
+            if (tabFile) {
+                tabFile.style.background = '#2563eb';
+                tabFile.style.color = '#ffffff';
+                tabFile.style.fontWeight = '700';
+                tabFile.style.boxShadow = '0 2px 6px rgba(37,99,235,0.3)';
+            }
+            if (tabCam) {
+                tabCam.style.background = 'transparent';
+                tabCam.style.color = '#64748b';
+                tabCam.style.fontWeight = '600';
+                tabCam.style.boxShadow = 'none';
+            }
+            if (secFile) secFile.style.display = 'block';
+            if (secCam) secCam.style.display = 'none';
+        } else {
+            if (tabCam) {
+                tabCam.style.background = '#2563eb';
+                tabCam.style.color = '#ffffff';
+                tabCam.style.fontWeight = '700';
+                tabCam.style.boxShadow = '0 2px 6px rgba(37,99,235,0.3)';
+            }
+            if (tabFile) {
+                tabFile.style.background = 'transparent';
+                tabFile.style.color = '#64748b';
+                tabFile.style.fontWeight = '600';
+                tabFile.style.boxShadow = 'none';
+            }
+            if (secCam) secCam.style.display = 'block';
+            if (secFile) secFile.style.display = 'none';
+        }
+    };
+
+    window.previewEditImageFile = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const previewImg = document.getElementById('editImagePreviewImg');
+            const previewContainer = document.getElementById('editImagePreviewContainer');
+            if (previewImg) previewImg.src = e.target.result;
+            if (previewContainer) previewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    window.startEditImageCamera = async function() {
+        try {
+            const video = document.getElementById('editImageVideo');
+            const placeholder = document.getElementById('editImageCameraPlaceholder');
+            const canvas = document.getElementById('editImageCanvas');
+            const btnStart = document.getElementById('btnStartCam');
+            const btnSnap = document.getElementById('btnSnapCam');
+            const btnRetake = document.getElementById('btnRetakeCam');
+            const btnSwitch = document.getElementById('btnSwitchCam');
+
+            if (canvas) canvas.style.display = 'none';
+            if (btnRetake) btnRetake.style.display = 'none';
+
+            const constraints = {
+                video: {
+                    facingMode: currentCameraFacingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+
+            editImageCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (video) {
+                video.srcObject = editImageCamStream;
+                video.style.display = 'block';
+            }
+            if (placeholder) placeholder.style.display = 'none';
+            if (btnStart) btnStart.style.display = 'none';
+            if (btnSnap) btnSnap.style.display = 'flex';
+            if (btnSwitch) btnSwitch.style.display = 'flex';
+        } catch (err) {
+            window.showAlert('Tidak dapat mengakses kamera: ' + err.message, 'error');
+        }
+    };
+
+    window.switchCameraFacingMode = async function() {
+        currentCameraFacingMode = (currentCameraFacingMode === 'environment') ? 'user' : 'environment';
+        if (editImageCamStream) {
+            stopEditImageCamera();
+            await startEditImageCamera();
+        }
+    };
+
+    window.stopEditImageCamera = function() {
+        if (editImageCamStream) {
+            editImageCamStream.getTracks().forEach(track => track.stop());
+            editImageCamStream = null;
+        }
+        const video = document.getElementById('editImageVideo');
+        if (video) {
+            video.pause();
+            video.srcObject = null;
+            video.style.display = 'none';
+        }
+        const btnStart = document.getElementById('btnStartCam');
+        const btnSnap = document.getElementById('btnSnapCam');
+        const btnSwitch = document.getElementById('btnSwitchCam');
+        const placeholder = document.getElementById('editImageCameraPlaceholder');
+        if (btnStart) btnStart.style.display = 'flex';
+        if (btnSnap) btnSnap.style.display = 'none';
+        if (btnSwitch) btnSwitch.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'block';
+    };
+
+    window.captureEditImageCamera = function() {
+        const video = document.getElementById('editImageVideo');
+        const canvas = document.getElementById('editImageCanvas');
+        const btnSnap = document.getElementById('btnSnapCam');
+        const btnRetake = document.getElementById('btnRetakeCam');
+        const btnSwitch = document.getElementById('btnSwitchCam');
+
+        if (!video || !canvas) return;
+
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        capturedBase64Image = canvas.toDataURL('image/jpeg', 0.88);
+
+        stopEditImageCamera();
+
+        if (canvas) canvas.style.display = 'block';
+        const placeholder = document.getElementById('editImageCameraPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+        if (btnSnap) btnSnap.style.display = 'none';
+        if (btnSwitch) btnSwitch.style.display = 'none';
+        if (btnRetake) btnRetake.style.display = 'flex';
+    };
+
+    window.retakeEditImageCamera = function() {
+        capturedBase64Image = null;
+        startEditImageCamera();
+    };
+
+    window.submitEditProductImage = async function() {
+        const productId = document.getElementById('editImageProductId')?.value;
+        if (!productId) return;
+
+        const btnSubmit = document.getElementById('btnSubmitEditImage');
+        const origBtnText = btnSubmit ? btnSubmit.innerText : 'Simpan Foto Produk';
+
+        const formData = new FormData();
+        const csrfToken = document.querySelector("[name='_token']")?.value || '';
+
+        if (currentEditTab === 'file') {
+            const fileInput = document.getElementById('editImageFileInput');
+            if (!fileInput || !fileInput.files[0]) {
+                window.showAlert('Harap pilih file gambar terlebih dahulu.', 'error');
+                return;
+            }
+            formData.append('image', fileInput.files[0]);
+        } else {
+            if (!capturedBase64Image) {
+                window.showAlert('Harap ambil foto menggunakan kamera terlebih dahulu.', 'error');
+                return;
+            }
+            formData.append('image_base64', capturedBase64Image);
+        }
+
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = '⏳ Menyimpan...';
+        }
+
+        try {
+            const url = `/kasir/products/${productId}/update-image`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+
+            const raw = await res.text();
+            const data = safeParseJson(raw);
+
+            if (!res.ok) throw new Error(data?.message || 'Gagal mengunggah foto.');
+
+            window.showAlert('Foto produk berhasil diperbarui!', 'success');
+
+            const prod = products.find(p => p.product_id == productId);
+            if (prod && data.image_url) {
+                prod.image_url = data.image_url;
+            }
+
+            renderProducts(products);
+            closeEditProductImageModal();
+        } catch (err) {
+            window.showAlert(err.message || 'Terjadi kesalahan saat menyimpan foto.', 'error');
+        } finally {
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = origBtnText;
+            }
+        }
+    };
+
     fetchProducts('');
     setupProductSearch();
     updateCartBadge();
 </script>
+
+{{-- Modal Edit Foto Produk (Pure Vanilla Inline CSS) --}}
+<div id="editProductImageModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;" onclick="if(event.target===this) closeEditProductImageModal()">
+    <div style="background: #ffffff; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); width: 100%; max-width: 540px; overflow: hidden; border: 1px solid #e2e8f0; margin: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        
+        {{-- Header --}}
+        <div style="background: #0f172a; color: #ffffff; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e293b;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 12px; background: rgba(37, 99, 235, 0.25); border: 1px solid rgba(59, 130, 246, 0.3); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                    📸
+                </div>
+                <div>
+                    <h3 id="editImageModalTitle" style="font-size: 16px; font-weight: 700; color: #ffffff; margin: 0; line-height: 1.2;">Ganti Foto Produk</h3>
+                    <p style="font-size: 12px; color: #94a3b8; margin: 2px 0 0 0;">Unggah file galeri atau jepret dari kamera HP/Tablet</p>
+                </div>
+            </div>
+            <button onclick="closeEditProductImageModal()" type="button" style="width: 36px; height: 36px; border-radius: 10px; background: #1e293b; color: #94a3b8; border: none; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                ✕
+            </button>
+        </div>
+
+        {{-- Body --}}
+        <div style="padding: 20px; box-sizing: border-box;">
+            <input type="hidden" id="editImageProductId">
+            
+            {{-- Segmented Control Tabs --}}
+            <div style="display: flex; background: #f1f5f9; padding: 4px; border-radius: 14px; gap: 6px; margin-bottom: 20px;">
+                <button type="button" id="tabUploadFile" onclick="switchEditImageTab('file')" style="flex: 1; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; text-align: center; border: none; cursor: pointer; transition: all 0.2s; background: #2563eb; color: #ffffff; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">
+                    📁 Upload File / Galeri
+                </button>
+                <button type="button" id="tabUseCamera" onclick="switchEditImageTab('camera')" style="flex: 1; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; text-align: center; border: none; cursor: pointer; transition: all 0.2s; background: transparent; color: #64748b;">
+                    📸 Kamera HP / Tablet
+                </button>
+            </div>
+
+            {{-- Section 1: File Upload --}}
+            <div id="editImageFileSection" style="display: block;">
+                <div onclick="document.getElementById('editImageFileInput').click()" style="border: 2px dashed #cbd5e1; border-radius: 16px; padding: 24px 16px; text-align: center; background: #f8fafc; cursor: pointer; transition: all 0.2s;">
+                    <input type="file" id="editImageFileInput" accept="image/*" onchange="previewEditImageFile(event)" style="display: none;">
+                    <div style="width: 52px; height: 52px; background: #eff6ff; color: #2563eb; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px auto; font-size: 24px;">
+                        📤
+                    </div>
+                    <div style="font-size: 14px; font-weight: 700; color: #1e293b;">Pilih Foto dari Perangkat</div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Format JPG, PNG, WEBP (Maksimal 5MB)</div>
+                </div>
+                
+                {{-- Preview Container --}}
+                <div id="editImagePreviewContainer" style="display: none; margin-top: 14px; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; background: #f8fafc; text-align: center;">
+                    <img id="editImagePreviewImg" src="" style="max-height: 220px; max-width: 100%; border-radius: 10px; object-fit: contain; margin: 0 auto; display: block;">
+                    <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-top: 8px;">Pratinjau Foto Pilihan</div>
+                </div>
+            </div>
+
+            {{-- Section 2: Camera View --}}
+            <div id="editImageCameraSection" style="display: none;">
+                <div style="position: relative; background: #020617; border-radius: 16px; overflow: hidden; height: 260px; display: flex; align-items: center; justify-content: center; border: 1px solid #1e293b;">
+                    <video id="editImageVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                    <canvas id="editImageCanvas" style="max-height: 250px; max-width: 100%; object-fit: contain; display: none;"></canvas>
+                    
+                    <div id="editImageCameraPlaceholder" style="text-align: center; padding: 16px;">
+                        <div style="width: 56px; height: 56px; background: #0f172a; color: #64748b; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px auto; font-size: 26px; border: 1px solid #1e293b;">
+                            🎥
+                        </div>
+                        <div style="font-size: 14px; font-weight: 700; color: #cbd5e1;">Kamera Belum Aktif</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Klik "Buka Kamera" untuk mengaktifkan kamera tablet.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+                    <button type="button" id="btnStartCam" onclick="startEditImageCamera()" style="flex: 1; padding: 12px; background: #0f172a; color: #ffffff; border: none; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        🎥 Buka Kamera
+                    </button>
+                    
+                    <button type="button" id="btnSnapCam" onclick="captureEditImageCamera()" style="flex: 1; padding: 12px; background: #059669; color: #ffffff; border: none; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 6px;">
+                        📸 Jepret Foto
+                    </button>
+                    
+                    <button type="button" id="btnSwitchCam" onclick="switchCameraFacingMode()" style="padding: 12px 14px; background: #e2e8f0; color: #334155; border: none; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 4px;" title="Ganti Kamera Depan / Belakang">
+                        🔄 Kamera
+                    </button>
+
+                    <button type="button" id="btnRetakeCam" onclick="retakeEditImageCamera()" style="flex: 1; padding: 12px; background: #e2e8f0; color: #334155; border: none; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 6px;">
+                        🔄 Foto Ulang
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Footer --}}
+        <div style="background: #f8fafc; padding: 14px 20px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+            <button onclick="closeEditProductImageModal()" type="button" style="padding: 10px 18px; background: #e2e8f0; color: #334155; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer;">
+                Batal
+            </button>
+            <button onclick="submitEditProductImage()" type="button" id="btnSubmitEditImage" style="padding: 10px 22px; background: #2563eb; color: #ffffff; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(37,99,235,0.3);">
+                Simpan Foto Produk
+            </button>
+        </div>
+    </div>
+</div>

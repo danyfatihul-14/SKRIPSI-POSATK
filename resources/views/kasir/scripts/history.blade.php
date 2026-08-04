@@ -193,7 +193,7 @@
             txn.items.forEach(item => {
                 itemsHtml += `
                     <tr style="border-bottom: 1px solid #f1f5f9; color: var(--dark);">
-                        <td style="padding: 6px 4px; font-weight: 600;">${escapeHtml(item.product_name)}</td>
+                        <td style="padding: 6px 4px; font-weight: 600;">${escapeHtml(item.product_name)}${item.variant ? ' (' + escapeHtml(item.variant) + ')' : ''}</td>
                         <td style="padding: 6px 4px; text-align: center;">${item.quantity}</td>
                         <td style="padding: 6px 4px; text-align: right;">Rp${Number(item.unit_price).toLocaleString('id-ID')}</td>
                         <td style="padding: 6px 4px; text-align: right; font-weight: 600;">Rp${Number(item.subtotal).toLocaleString('id-ID')}</td>

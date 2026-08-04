@@ -27,11 +27,7 @@ class StockReportDashboard extends Page
     {
         $this->stores = Store::query()->pluck('name_store', 'store_id')->toArray();
         $userStoreId = auth()->user()?->store_id;
-        if ($userStoreId) {
-            $this->storeId = (int)$userStoreId;
-        } else {
-            $this->storeId = null;
-        }
+        $this->storeId = $userStoreId ? (int)$userStoreId : null;
     }
 
     public function updatedStoreId(): void

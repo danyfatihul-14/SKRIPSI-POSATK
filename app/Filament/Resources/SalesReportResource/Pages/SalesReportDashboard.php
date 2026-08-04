@@ -18,6 +18,8 @@ class SalesReportDashboard extends Page
     public ?int $storeId = null;
     public array $stores = [];
     public int $perPage = 10;
+    public int $topProductsPerPage = 10;
+    public int $topProductsPage = 1;
     public array $summaryRows = [];
     public array $topRows = [];
     public array $recentTransactions = [];
@@ -41,11 +43,7 @@ class SalesReportDashboard extends Page
         
         // Default to user's store_id if set, or null (all stores)
         $userStoreId = auth()->user()?->store_id;
-        if ($userStoreId) {
-            $this->storeId = (int)$userStoreId;
-        } else {
-            $this->storeId = null;
-        }
+        $this->storeId = $userStoreId ? (int)$userStoreId : null;
 
         $this->startDate = now()->startOfMonth()->toDateString();
         $this->endDate = now()->toDateString();
@@ -388,9 +386,15 @@ class SalesReportDashboard extends Page
         $unitCol = $this->firstExistingColumn('products', ['unit']) ?? null;
         $unitSelect = $unitCol ? ", p.$unitCol as unit" : ", 'pcs' as unit";
 
+        $variantCol = $this->firstExistingColumn('products', ['variant']) ?? null;
+        $variantSelect = $variantCol ? ", p.$variantCol as variant" : ", '' as variant";
+
         $groupBy = ["p.$prodPk", "p.$prodName"];
         if ($unitCol) {
             $groupBy[] = "p.$unitCol";
+        }
+        if ($variantCol) {
+            $groupBy[] = "p.$variantCol";
         }
 
         return $query
@@ -402,14 +406,15 @@ class SalesReportDashboard extends Page
                 SUM(d.$qtyCol) as qty,
                 $omzetExpr as omzet
                 $unitSelect
+                $variantSelect
             ")
             ->orderByDesc('qty')
-            ->limit(5)
             ->get()
             ->map(fn($x) => [
                 'periode' => $x->periode,
                 'product_id' => $x->product_id,
                 'product_name' => $x->product_name,
+                'variant' => $x->variant ?? '',
                 'qty' => (int) $x->qty,
                 'omzet' => (float) $x->omzet,
                 'unit' => $x->unit ?? 'pcs',
@@ -433,6 +438,74 @@ class SalesReportDashboard extends Page
         return null;
     }
 
+    public function filterToday(): void
+    {
+        $this->startDate = now()->toDateString();
+        $this->endDate = now()->toDateString();
+        $this->refreshData();
+    }
+
+    public function filter3Days(): void
+    {
+        $this->startDate = now()->subDays(2)->toDateString();
+        $this->endDate = now()->toDateString();
+        $this->refreshData();
+    }
+
+    public function filter7Days(): void
+    {
+        $this->startDate = now()->subDays(6)->toDateString();
+        $this->endDate = now()->toDateString();
+        $this->refreshData();
+    }
+
+    public function filterThisMonth(): void
+    {
+        $this->startDate = now()->startOfMonth()->toDateString();
+        $this->endDate = now()->toDateString();
+        $this->refreshData();
+    }
+
+    public function filterThisYear(): void
+    {
+        $this->startDate = now()->startOfYear()->toDateString();
+        $this->endDate = now()->toDateString();
+        $this->refreshData();
+    }
+
+    public function getDateRangeLabelProperty(): string
+    {
+        if (! $this->startDate || ! $this->endDate) {
+            return 'Periode Terfilter';
+        }
+
+        $start = Carbon::parse($this->startDate);
+        $end = Carbon::parse($this->endDate);
+        $diffDays = (int) $start->diffInDays($end->copy()->startOfDay());
+
+        if ($diffDays === 0) {
+            return 'Hari Ini - ' . $start->format('d M Y');
+        }
+
+        if ($start->toDateString() === now()->subDays(2)->toDateString() && $end->toDateString() === now()->toDateString()) {
+            return '3 Hari Terakhir';
+        }
+
+        if ($start->toDateString() === now()->subDays(6)->toDateString() && $end->toDateString() === now()->toDateString()) {
+            return '7 Hari Terakhir';
+        }
+
+        if ($start->toDateString() === now()->startOfMonth()->toDateString() && $end->toDateString() === now()->toDateString()) {
+            return 'Bulan Ini (' . $start->format('M Y') . ')';
+        }
+
+        if ($start->toDateString() === now()->startOfYear()->toDateString() && $end->toDateString() === now()->toDateString()) {
+            return 'Tahun Ini (' . $start->format('Y') . ')';
+        }
+
+        return $start->format('d M Y') . ' - ' . $end->format('d M Y');
+    }
+
     protected function loadTrendChartData(): void
     {
         if (!Schema::hasTable('transactions')) return;
@@ -447,11 +520,7 @@ class SalesReportDashboard extends Page
 
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
-        $diffDays = $start->diffInDays($end);
-        if ($diffDays > 60) {
-            $diffDays = 60;
-            $start = $end->copy()->subDays(60)->startOfDay();
-        }
+        $diffDays = (int) $start->diffInDays($end->copy()->startOfDay());
 
         $q = DB::table('transactions')
             ->whereBetween('created_at', [$start, $end]);
@@ -465,21 +534,100 @@ class SalesReportDashboard extends Page
             $q->whereIn('status', ['paid', 'success', 'completed', 'selesai']);
         }
 
-        $rows = $q->selectRaw("DATE(created_at) as d, COUNT(*) as trx, COALESCE(SUM($totalColumn),0) as sales")
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->keyBy('d');
-
         $labels = [];
         $sales = [];
         $trx = [];
 
-        for ($i = $diffDays; $i >= 0; $i--) {
-            $date = $end->copy()->subDays($i)->toDateString();
-            $labels[] = \Carbon\Carbon::parse($date)->format('d M');
-            $sales[] = (float) ($rows[$date]->sales ?? 0);
-            $trx[] = (int) ($rows[$date]->trx ?? 0);
+        if ($diffDays <= 0) {
+            // 1 HARI (Hari Ini): Breakdown PER 1 JAM (07:00 s/d 20:00 atau jam aktif)
+            $rows = $q->selectRaw("HOUR(created_at) as h, COUNT(*) as trx, COALESCE(SUM($totalColumn),0) as sales")
+                ->groupBy('h')
+                ->orderBy('h')
+                ->get()
+                ->keyBy('h');
+
+            $startHour = 7;
+            $endHour = 20; // 8 malam (20:00)
+
+            $minH = $rows->keys()->min();
+            $maxH = $rows->keys()->max();
+
+            if ($minH !== null && (int)$minH < $startHour) {
+                $startHour = (int) $minH;
+            }
+            if ($maxH !== null && (int)$maxH > $endHour) {
+                $endHour = (int) $maxH;
+            }
+
+            for ($h = $startHour; $h <= $endHour; $h++) {
+                $hourStr = sprintf('%02d:00', $h);
+                $labels[] = $hourStr;
+                $sales[] = (float) ($rows[$h]->sales ?? 0);
+                $trx[] = (int) ($rows[$h]->trx ?? 0);
+            }
+        } elseif ($diffDays >= 1 && $diffDays <= 4) {
+            // 2 S/D 4 HARI: Breakdown PER 4 JAM agar grafik berbentuk kurva halus (12-16 titik)
+            $rows = $q->selectRaw("DATE(created_at) as d, FLOOR(HOUR(created_at) / 4) * 4 as h, COUNT(*) as trx, COALESCE(SUM($totalColumn),0) as sales")
+                ->groupBy('d', 'h')
+                ->orderBy('d')
+                ->orderBy('h')
+                ->get();
+
+            $dataMap = [];
+            foreach ($rows as $r) {
+                $key = $r->d . '_' . sprintf('%02d:00', (int)$r->h);
+                $dataMap[$key] = $r;
+            }
+
+            $currentDate = $start->copy()->startOfDay();
+            $endDate = $end->copy()->startOfDay();
+
+            while ($currentDate <= $endDate) {
+                $dStr = $currentDate->toDateString();
+                $dayFormatted = $currentDate->format('d M');
+
+                foreach ([8, 12, 16, 20] as $h) {
+                    $hStr = sprintf('%02d:00', $h);
+                    $key = $dStr . '_' . $hStr;
+                    $labels[] = $dayFormatted . ' ' . $hStr;
+                    $sales[] = (float) ($dataMap[$key]->sales ?? 0);
+                    $trx[] = (int) ($dataMap[$key]->trx ?? 0);
+                }
+
+                $currentDate->addDay();
+            }
+        } elseif ($diffDays > 60) {
+            // LEBIH DARI 60 HARI (Misal 1 Tahun): Breakdown PER BULAN
+            $rows = $q->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as m, COUNT(*) as trx, COALESCE(SUM($totalColumn),0) as sales")
+                ->groupBy('m')
+                ->orderBy('m')
+                ->get()
+                ->keyBy('m');
+
+            $current = $start->copy()->startOfMonth();
+            $endMonth = $end->copy()->startOfMonth();
+
+            while ($current <= $endMonth) {
+                $mKey = $current->format('Y-m');
+                $labels[] = $current->format('M Y');
+                $sales[] = (float) ($rows[$mKey]->sales ?? 0);
+                $trx[] = (int) ($rows[$mKey]->trx ?? 0);
+                $current->addMonth();
+            }
+        } else {
+            // 5 HARI S/D 60 HARI (Misal 7 Hari, 14 Hari, 30 Hari): Breakdown PER TANGGAL
+            $rows = $q->selectRaw("DATE(created_at) as d, COUNT(*) as trx, COALESCE(SUM($totalColumn),0) as sales")
+                ->groupBy('d')
+                ->orderBy('d')
+                ->get()
+                ->keyBy('d');
+
+            for ($i = $diffDays; $i >= 0; $i--) {
+                $date = $end->copy()->subDays($i)->toDateString();
+                $labels[] = Carbon::parse($date)->format('d M');
+                $sales[] = (float) ($rows[$date]->sales ?? 0);
+                $trx[] = (int) ($rows[$date]->trx ?? 0);
+            }
         }
 
         $this->trendLabels = $labels;
@@ -493,7 +641,11 @@ class SalesReportDashboard extends Page
         $end = Carbon::parse($this->endDate)->endOfDay();
         $topProducts = collect($this->getTopProducts($start, $end, 'Periode Terfilter'));
 
-        $this->topProductLabels = $topProducts->pluck('product_name')->values()->toArray();
+        $this->topProductLabels = $topProducts->map(function ($p) {
+            $name = $p['product_name'] ?? 'Produk';
+            return !empty($p['variant']) ? "$name ({$p['variant']})" : $name;
+        })->values()->toArray();
+
         $this->topProductQty = $topProducts->pluck('qty')->map(fn($x) => (int) $x)->values()->toArray();
     }
 
@@ -502,7 +654,8 @@ class SalesReportDashboard extends Page
         $product = \App\Models\Product::find($productId);
         if (!$product) return;
 
-        $this->selectedProductName = $product->product_name;
+        $variantStr = !empty($product->variant) ? " ({$product->variant})" : "";
+        $this->selectedProductName = $product->product_name . $variantStr;
 
         $detailTable = $this->firstExistingTable(['transaction_items', 'transaction_details', 'sale_items', 'sales_items']);
         $trxFk = $this->firstExistingColumn($detailTable, ['transaction_id', 'sale_id', 'sales_id']) ?? 'transaction_id';

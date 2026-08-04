@@ -95,6 +95,16 @@ class ProductResource extends Resource
                 ->label('Toko')
                 ->options(fn() => Store::query()->pluck('name_store', 'store_id'))
                 ->searchable()
+                ->preload()
+                ->live()
+                ->afterStateUpdated(function ($state, Forms\Set $set, $record) {
+                    if (! $record || ! $state) return;
+                    $stockLevel = \App\Models\StockLevel::where('product_id', $record->product_id)
+                        ->where('store_id', (int) $state)
+                        ->first();
+                    $set('initial_stock', $stockLevel ? (int) $stockLevel->quantity : 0);
+                    $set('initial_discount', $stockLevel ? (float) $stockLevel->discount : 0);
+                })
                 ->required(fn(string $operation) => $operation === 'create')
                 ->dehydrated(true),
 
@@ -132,6 +142,7 @@ class ProductResource extends Resource
                         ->label('Satuan')
                         ->options([
                             'biji' => 'Biji',
+                            'pcs' => 'Pcs',
                             'lusin' => 'Lusin',
                             'pack' => 'Pack',
                             'dus' => 'Dus',
@@ -140,6 +151,11 @@ class ProductResource extends Resource
                             'box' => 'Box',
                             'rol' => 'Rol',
                             'set' => 'Set',
+                            'lembar' => 'Lembar',
+                            'kg' => 'Kg',
+                            'gram' => 'Gram',
+                            'btl' => 'Botol',
+                            'porsi' => 'Porsi',
                         ])
                         ->required()
                         ->default('biji'),
@@ -183,17 +199,30 @@ class ProductResource extends Resource
 
             Forms\Components\Select::make('unit')
                 ->label('Satuan')
-                ->options([
-                    'biji' => 'Biji',
-                    'lusin' => 'Lusin',
-                    'pack' => 'Pack',
-                    'dus' => 'Dus',
-                    'rim' => 'Rim',
-                    'pak' => 'Pak',
-                    'box' => 'Box',
-                    'rol' => 'Rol',
-                    'set' => 'Set',
-                ])
+                ->options(function ($record) {
+                    $units = [
+                        'biji' => 'Biji',
+                        'pcs' => 'Pcs',
+                        'lusin' => 'Lusin',
+                        'pack' => 'Pack',
+                        'dus' => 'Dus',
+                        'rim' => 'Rim',
+                        'pak' => 'Pak',
+                        'box' => 'Box',
+                        'rol' => 'Rol',
+                        'set' => 'Set',
+                        'lembar' => 'Lembar',
+                        'kg' => 'Kg',
+                        'gram' => 'Gram',
+                        'btl' => 'Botol',
+                        'porsi' => 'Porsi',
+                    ];
+                    if ($record && ! empty($record->unit) && ! isset($units[$record->unit])) {
+                        $units[$record->unit] = ucfirst($record->unit);
+                    }
+                    return $units;
+                })
+                ->searchable()
                 ->required(fn(string $operation) => $operation === 'edit')
                 ->visible(fn(string $operation) => $operation === 'edit'),
 

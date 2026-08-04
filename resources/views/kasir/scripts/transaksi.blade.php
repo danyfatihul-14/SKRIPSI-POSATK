@@ -213,6 +213,7 @@
             const mapped = window.selectedPendingTransaction.items.map(function(item) {
                 return {
                     id: item.product_id || item.id,
+                    price: Number(item.price || item.unit_price || 0),
                     qty: Number(item.qty || item.quantity || 0)
                 };
             }).filter(function(row) {
@@ -549,16 +550,27 @@
         updateChange();
     });
 
+    let isSubmittingPayment = false;
+
     document.getElementById("paymentForm")?.addEventListener("submit", function(e) {
+        if (isSubmittingPayment) {
+            e.preventDefault();
+            return;
+        }
+
         const paymentMethod = (document.getElementById("paymentMethod") || {}).value || "cash";
         const paymentEl = document.getElementById("payment");
         const totalNow = Number(getOrderTotal() || 0);
+
+        isSubmittingPayment = true;
 
         // QRIS: buka modal dulu
         if (paymentMethod === "qris" && !qrisPaid) {
             e.preventDefault();
             setSubmitLoading(true);
-            generateQrisCode();
+            generateQrisCode().finally(() => {
+                isSubmittingPayment = false;
+            });
             return;
         }
 
@@ -580,6 +592,7 @@
                 })
                 .finally(function() {
                     setSubmitLoading(false);
+                    isSubmittingPayment = false;
                     qrisPaid = false;
                 });
 
@@ -595,6 +608,7 @@
                 })
                 .finally(function() {
                     setSubmitLoading(false);
+                    isSubmittingPayment = false;
                     qrisPaid = false;
                 });
         } else {
@@ -608,6 +622,7 @@
                 })
                 .finally(function() {
                     setSubmitLoading(false);
+                    isSubmittingPayment = false;
                     qrisPaid = false;
                 });
         }

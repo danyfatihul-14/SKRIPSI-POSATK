@@ -104,8 +104,10 @@
         activeAdjustProductId = null;
     }
 
+    let isSubmittingStockAdjust = false;
+
     function saveStockAdjustment() {
-        if (!activeAdjustProductId) return;
+        if (!activeAdjustProductId || isSubmittingStockAdjust) return;
 
         const newQtyInput = document.getElementById('adjustModalNewQty');
         const incomingQty = parseInt(newQtyInput.value);
@@ -114,6 +116,8 @@
             window.showAlert('Jumlah barang masuk harus berupa angka positif!', 'warning');
             return;
         }
+
+        isSubmittingStockAdjust = true;
 
         const currentQty = parseInt(document.getElementById('adjustModalCurrentQty').innerText) || 0;
         const quantity = currentQty + incomingQty;
@@ -148,6 +152,9 @@
         .catch(e => {
             console.error(e);
             window.showAlert('Terjadi kesalahan jaringan saat menyimpan stok.', 'error');
+        })
+        .finally(() => {
+            isSubmittingStockAdjust = false;
         });
     }
 
@@ -219,8 +226,12 @@
         previewBox.style.display = 'flex';
     }
 
+    let isSubmittingStockConvert = false;
+
     function handleStockConvert(e) {
         e.preventDefault();
+
+        if (isSubmittingStockConvert) return;
 
         const sourceSelect = document.getElementById('convertSourceProduct');
         const targetSelect = document.getElementById('convertTargetProduct');
@@ -258,6 +269,7 @@
         }
 
         window.showConfirm('Apakah Anda yakin ingin memecah/mengkonversi stok produk ini?', () => {
+            isSubmittingStockConvert = true;
             const params = new URLSearchParams();
             params.append('source_product_id', sourceSelect.value);
             params.append('target_product_id', targetSelect.value);
@@ -291,6 +303,9 @@
             .catch(e => {
                 console.error(e);
                 window.showAlert('Terjadi kesalahan jaringan saat memproses konversi stok.', 'error');
+            })
+            .finally(() => {
+                isSubmittingStockConvert = false;
             });
         });
     }

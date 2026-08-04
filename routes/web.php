@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/kasir/stok/convert', [KasirController::class, 'convertStock'])->name('kasir.stok.convert');
     Route::get('/kasir/categories', [KasirController::class, 'getCategories'])->name('kasir.categories');
     Route::post('/kasir/products', [KasirController::class, 'storeProduct'])->name('kasir.products.store');
+    Route::post('/kasir/products/{product}/update-image', [KasirController::class, 'updateProductImage'])->name('kasir.products.update-image');
     Route::get('/cashier', function () {
         return view('kasir.dashboard');})->name('cashier');
 });

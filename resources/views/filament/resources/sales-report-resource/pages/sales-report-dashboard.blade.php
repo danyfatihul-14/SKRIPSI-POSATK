@@ -5,9 +5,14 @@
         $avgTicket = $filtered['trx'] > 0 ? ($filtered['uang'] / $filtered['trx']) : 0;
         $profitMargin = $filtered['uang'] > 0 ? (($filtered['profit'] / $filtered['uang']) * 100) : 0;
 
-        // Extract Top 5 Products for the range
-        $topProductsRange = collect($topRows)->where('periode', 'Periode Terfilter')->sortByDesc('qty')->take(5);
-        $maxQty = $topProductsRange->max('qty') ?: 1;
+        // Extract all products for the range & paginate
+        $allTopProducts = collect($topRows)->where('periode', 'Periode Terfilter')->sortByDesc('qty')->values()->all();
+        $totalTopProducts = count($allTopProducts);
+        $maxQty = collect($allTopProducts)->max('qty') ?: 1;
+        $topPages = $topProductsPerPage > 0 ? (int)ceil($totalTopProducts / $topProductsPerPage) : 1;
+        $topCurrentPage = min(max(1, $topProductsPage), max(1, $topPages));
+        $topOffset = ($topCurrentPage - 1) * $topProductsPerPage;
+        $topProductsRange = array_slice($allTopProducts, $topOffset, $topProductsPerPage);
     @endphp
 
     <style>
@@ -403,6 +408,16 @@
                         </svg>
                         Cetak Laporan (PDF)
                     </button>
+
+                    {{-- Quick Preset Filter Buttons --}}
+                    <div class="flex items-center gap-1.5 flex-wrap w-full mt-2 no-print">
+                        <span class="text-xs font-semibold text-slate-500 mr-1">Filter Cepat:</span>
+                        <button type="button" wire:click="filterToday" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition">⚡ Hari Ini</button>
+                        <button type="button" wire:click="filter3Days" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition">📊 3 Hari</button>
+                        <button type="button" wire:click="filter7Days" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition">📈 7 Hari</button>
+                        <button type="button" wire:click="filterThisMonth" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition">🗓️ Bulan Ini</button>
+                        <button type="button" wire:click="filterThisYear" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition">🚀 Tahun Ini</button>
+                    </div>
                 </div>
             </div>
 
@@ -468,24 +483,24 @@
 
         {{-- First Grid Row: Trend Charts --}}
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div class="card-panel" wire:ignore>
+            <div class="card-panel">
                 <div class="card-panel-header">
                     <div class="card-panel-title">
-                        <span style="color:#3b82f6;">📊</span> Trend Grafik Omzet (30 Hari Terakhir)
+                        <span style="color:#3b82f6;">📊</span> Trend Grafik Omzet ({{ $this->dateRangeLabel }})
                     </div>
                 </div>
-                <div class="p-6">
+                <div class="p-6" wire:ignore>
                     <canvas id="omzetTrendChart" height="130"></canvas>
                 </div>
             </div>
 
-            <div class="card-panel" wire:ignore>
+            <div class="card-panel">
                 <div class="card-panel-header">
                     <div class="card-panel-title">
-                        <span style="color:#f59e0b;">📈</span> Trend Grafik Transaksi (30 Hari Terakhir)
+                        <span style="color:#f59e0b;">📈</span> Trend Grafik Transaksi ({{ $this->dateRangeLabel }})
                     </div>
                 </div>
-                <div class="p-6">
+                <div class="p-6" wire:ignore>
                     <canvas id="trxTrendChart" height="130"></canvas>
                 </div>
             </div>
@@ -535,11 +550,29 @@
                 </div>
             </div>
 
-            {{-- Top 5 Produk Terlaris --}}
+            {{-- Klasifikasi & Ringkasan Produk Terpopuler --}}
             <div class="card-panel">
                 <div class="card-panel-header">
                     <div class="card-panel-title">
-                        <span>🏆</span> Top 5 Produk Terlaris (Terfilter)
+                        <span>🏆</span> Klasifikasi & Ringkasan Produk Terpopuler (Terfilter)
+                    </div>
+                    {{-- Per-page selector toolbar --}}
+                    <div class="flex items-center gap-3 no-print">
+                        <span class="text-xs text-gray-500 font-medium">Tampilkan:</span>
+                        <div class="flex items-center gap-1">
+                            @foreach([10, 20, 50, 100] as $opt)
+                                <button
+                                    wire:click="$set('topProductsPerPage', {{ $opt }})"
+                                    class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all
+                                           {{ $topProductsPerPage == $opt
+                                              ? 'bg-blue-600 text-white shadow-sm'
+                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}"
+                                >
+                                    {{ $opt }}
+                                </button>
+                            @endforeach
+                        </div>
+                        <span class="text-xs text-gray-400">baris</span>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -560,8 +593,15 @@
                                     $percentage = ($row['qty'] / $maxQty) * 100;
                                 @endphp
                                 <tr class="hover:bg-blue-50/40 transition-colors">
-                                    <td class="px-6 py-4 text-center font-extrabold text-gray-300 text-base">{{ $loop->iteration }}</td>
-                                    <td class="px-6 py-4 font-bold text-gray-800 text-sm">{{ $row['product_name'] }}</td>
+                                    <td class="px-6 py-4 text-center font-extrabold text-gray-400 text-sm">{{ $topOffset + $loop->iteration }}</td>
+                                    <td class="px-6 py-4 font-bold text-gray-800 text-sm">
+                                        <div class="font-bold text-gray-900">{{ $row['product_name'] }}</div>
+                                        @if(!empty($row['variant']))
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 mt-1">
+                                                🏷️ Varian: {{ $row['variant'] }}
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="px-6 py-4 text-right font-bold text-gray-700 text-sm">{{ number_format($row['qty'], 0, ',', '.') }} {{ strtoupper($row['unit'] ?? 'pcs') }}</td>
                                     <td class="px-6 py-4">
                                         <div class="progress-bar-container">
@@ -585,6 +625,38 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- Product Pagination Footer --}}
+                @if($topPages > 1)
+                <div class="px-6 py-3 bg-gray-50 border-t flex flex-wrap items-center justify-between gap-3 no-print">
+                    <div class="text-xs text-gray-500 font-medium">
+                        Menampilkan <span class="font-bold text-gray-800">{{ $topOffset + 1 }}</span> – <span class="font-bold text-gray-800">{{ min($topOffset + $topProductsPerPage, $totalTopProducts) }}</span> dari <span class="font-bold text-gray-800">{{ $totalTopProducts }}</span> produk terjual
+                    </div>
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <button
+                            wire:click="$set('topProductsPage', {{ max(1, $topCurrentPage - 1) }})"
+                            @disabled($topCurrentPage <= 1)
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                            ‹ Sebelumnya
+                        </button>
+
+                        @for($p = 1; $p <= $topPages; $p++)
+                            <button
+                                wire:click="$set('topProductsPage', {{ $p }})"
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold transition {{ $topCurrentPage == $p ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100' }}">
+                                {{ $p }}
+                            </button>
+                        @endfor
+
+                        <button
+                            wire:click="$set('topProductsPage', {{ min($topPages, $topCurrentPage + 1) }})"
+                            @disabled($topCurrentPage >= $topPages)
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                            Selanjutnya ›
+                        </button>
+                    </div>
+                </div>
+                @endif
             </div>
         </div>
 

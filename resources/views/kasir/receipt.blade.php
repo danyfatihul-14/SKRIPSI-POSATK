@@ -37,13 +37,15 @@
         /* Thermal Printer Style - 80mm width */
         .thermal-receipt {
             width: 80mm;
-            padding: 5px 6px;
+            max-width: 100%;
+            padding: 8px 10px;
             font-family: 'Courier New', monospace;
             font-size: 12px;
-            line-height: 1.1;
+            line-height: 1.2;
             background: #fff;
             color: #000;
             box-sizing: border-box;
+            word-wrap: break-word;
         }
 
         .thermal-header {
@@ -51,6 +53,7 @@
             margin-bottom: 8px;
             border-bottom: 1px dashed #000;
             padding-bottom: 6px;
+            word-break: break-word;
         }
 
         .thermal-divider {
@@ -62,24 +65,28 @@
             font-weight: bold;
             font-size: 14px;
             margin-bottom: 2px;
+            word-break: break-word;
         }
 
         .thermal-store-info {
             font-size: 11px;
             color: #333;
             margin-bottom: 8px;
+            word-break: break-word;
         }
 
         .thermal-code {
             font-size: 12px;
             font-weight: bold;
             margin-bottom: 4px;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            word-break: break-all;
         }
 
         .thermal-datetime {
             font-size: 11px;
             margin-bottom: 10px;
+            word-break: break-word;
         }
 
         .thermal-content {
@@ -89,7 +96,7 @@
         .thermal-item {
             font-family: 'Courier New', monospace;
             font-size: 12px;
-            margin-bottom: 3px;
+            margin-bottom: 4px;
             word-wrap: break-word;
             line-height: 1.15;
         }
@@ -97,23 +104,31 @@
         .thermal-item-name {
             display: block;
             margin-bottom: 2px;
+            word-break: break-word;
+            word-wrap: break-word;
+            white-space: normal;
+            font-weight: 600;
+            line-height: 1.25;
         }
 
         .thermal-item-detail {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 11px;
             padding: 0;
+            gap: 4px;
         }
 
         .thermal-item-qty-price {
             flex: 1;
             text-align: left;
+            white-space: nowrap;
         }
 
         .thermal-item-price-right {
             text-align: right;
-            min-width: 60px;
+            white-space: nowrap;
         }
 
         .thermal-summary {
@@ -124,18 +139,21 @@
         .thermal-summary-row {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 12px;
             margin-bottom: 2px;
             letter-spacing: 0.5px;
+            gap: 4px;
         }
 
         .thermal-summary-row span:first-child {
             flex: 1;
+            word-break: break-word;
         }
 
         .thermal-summary-row span:last-child {
             text-align: right;
-            min-width: 70px;
+            white-space: nowrap;
         }
 
         .thermal-total {
@@ -474,7 +492,11 @@
                 @foreach($transaction->items as $item)
                 <div class="thermal-item">
                     <div class="thermal-item-name">
-                        {{ substr($item->product?->product_name ?? 'Produk', 0, 19) }}
+                        @php
+                            $pName = $item->product?->product_name ?? 'Produk';
+                            $vName = trim($item->product?->variant ?? '');
+                        @endphp
+                        {{ $pName }}{{ $vName !== '' ? ' ('.$vName.')' : '' }}
                     </div>
                     <div class="thermal-item-detail">
                         <div class="thermal-item-qty-price">

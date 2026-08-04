@@ -20,6 +20,7 @@ class ProductReportDashboard extends Page
     public ?string $startDate   = null;
     public ?string $endDate     = null;
     public int   $perPage       = 10;
+    public int   $page          = 1;
 
     // Data
     public array  $topProductLabels  = [];
@@ -50,10 +51,11 @@ class ProductReportDashboard extends Page
     public function updatedStoreId(): void       { $this->refreshData(); }
     public function updatedStartDate(): void     { $this->refreshData(); }
     public function updatedEndDate(): void       { $this->refreshData(); }
-    public function updatedPerPage(): void        { $this->loadTopRows(); }
+    public function updatedPerPage(): void        { $this->page = 1; $this->loadTopRows(); }
 
     public function refreshData(): void
     {
+        $this->page = 1;
         $this->loadTopProductChartData();
         $this->loadTopRows();
     }
@@ -99,17 +101,23 @@ class ProductReportDashboard extends Page
 
         $this->applyBaseFilters($query);
 
+        $hasVariant = Schema::hasColumn('products', 'variant');
+        $variantSelect = $hasVariant ? ', p.variant as variant' : ", '' as variant";
+
         $results = $query
-            ->selectRaw('p.product_name as product_name, SUM(d.quantity) as qty')
-            ->groupBy('p.product_id', 'p.product_name')
+            ->selectRaw("p.product_name as product_name, SUM(d.quantity) as qty $variantSelect")
+            ->groupBy($hasVariant ? ['p.product_id', 'p.product_name', 'p.variant'] : ['p.product_id', 'p.product_name'])
             ->orderByDesc('qty')
-            ->limit(10)
             ->get();
 
-        $this->topProductLabels    = $results->pluck('product_name')->values()->all();
-        $this->topProductQty       = $results->pluck('qty')->map(fn($v) => (int) $v)->values()->all();
-        $this->totalUniqueProducts = count($this->topProductLabels);
-        $this->totalQtySold        = array_sum($this->topProductQty);
+        $this->topProductLabels = $results->map(function ($r) {
+            $v = trim($r->variant ?? '');
+            return ($v !== '' && $v !== '-') ? "{$r->product_name} ($v)" : $r->product_name;
+        })->take(10)->values()->all();
+
+        $this->topProductQty       = $results->take(10)->pluck('qty')->map(fn($v) => (int) $v)->values()->all();
+        $this->totalUniqueProducts = count($results);
+        $this->totalQtySold        = (int) $results->sum('qty');
         $this->topProductName      = $this->topProductLabels[0] ?? '-';
         $this->topProductCount     = $this->topProductQty[0] ?? 0;
     }
@@ -129,6 +137,10 @@ class ProductReportDashboard extends Page
 
         $hasUnit = Schema::hasColumn('products', 'unit');
         $unitSelect = $hasUnit ? ', p.unit as unit' : ", 'pcs' as unit";
+        
+        $hasVariant = Schema::hasColumn('products', 'variant');
+        $variantSelect = $hasVariant ? ', p.variant as variant' : ", '' as variant";
+        
         $prodPk = Schema::hasColumn('products', 'product_id') ? 'product_id' : 'id';
 
         $query = DB::table('transaction_items as d')
@@ -137,17 +149,21 @@ class ProductReportDashboard extends Page
 
         $this->applyBaseFilters($query);
 
+        $groupBy = ["p.$prodPk", 'p.product_name'];
+        if ($hasUnit) $groupBy[] = 'p.unit';
+        if ($hasVariant) $groupBy[] = 'p.variant';
+
         $rows = $query
-            ->selectRaw("p.$prodPk as product_id, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect")
-            ->groupBy($hasUnit ? ["p.$prodPk", 'p.product_name', 'p.unit'] : ["p.$prodPk", 'p.product_name'])
+            ->selectRaw("p.$prodPk as product_id, p.product_name as product_name, SUM(d.quantity) as qty, COALESCE(SUM(d.subtotal),0) as omzet $unitSelect $variantSelect")
+            ->groupBy($groupBy)
             ->orderByDesc('qty')
-            ->limit($this->perPage)
             ->get();
 
         $this->topRows = $rows->map(fn($r) => [
             'periode'      => 'Periode Terfilter',
             'product_id'   => (int)    $r->product_id,
             'product_name' => (string) $r->product_name,
+            'variant'      => (string) ($r->variant ?? ''),
             'qty'          => (int)    $r->qty,
             'omzet'        => (float)  $r->omzet,
             'unit'         => $r->unit ?? 'pcs',
@@ -159,7 +175,8 @@ class ProductReportDashboard extends Page
         $product = \App\Models\Product::find($productId);
         if (!$product) return;
 
-        $this->selectedProductName = $product->product_name;
+        $vStr = !empty($product->variant) && $product->variant !== '-' ? " ({$product->variant})" : '';
+        $this->selectedProductName = $product->product_name . $vStr;
 
         $query = DB::table('transaction_items as d')
             ->join('transactions as t', 't.transaction_id', '=', 'd.transaction_id')

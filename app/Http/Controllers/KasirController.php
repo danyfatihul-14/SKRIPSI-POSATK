@@ -7,6 +7,7 @@ use App\Models\StockLevel;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Midtrans\Config;
@@ -32,11 +33,11 @@ class KasirController extends Controller
 
     public function search(Request $request)
     {
-        $q = $request->get('q', '');
+        $q = trim($request->get('q', ''));
         $storeId = $request->user()?->store_id;
 
         $query = Product::query()->with([
-            'stockLevels' => fn($subQuery) => $subQuery->where('store_id', $storeId),
+            'stockLevels' => fn($subQuery) => $storeId ? $subQuery->where('store_id', $storeId) : $subQuery,
             'category',
         ]);
 
@@ -49,14 +50,17 @@ class KasirController extends Controller
         if (! empty($q)) {
             $query->where(function ($subQuery) use ($q) {
                 $subQuery->where('product_name', 'like', "%$q%")
-                    ->orWhere('variant', 'like', "%$q%");
+                    ->orWhere('variant', 'like', "%$q%")
+                    ->orWhereHas('category', fn($catQuery) => $catQuery->where('category_name', 'like', "%$q%"));
             });
         }
 
         $dynamicCategories = \App\Models\Category::where('is_dynamic_price', true)->get();
 
-        $products = $query->get()->map(function ($product) use ($dynamicCategories) {
-            $stockLevel = $product->stockLevels->first();
+        $products = $query->get()->map(function ($product) use ($dynamicCategories, $storeId) {
+            $stockLevel = $storeId
+                ? $product->stockLevels->firstWhere('store_id', $storeId)
+                : $product->stockLevels->first();
 
             // Check if dynamic price
             $isDynamic = false;
@@ -107,6 +111,12 @@ class KasirController extends Controller
 
             if (! is_array($cart) || empty($cart)) {
                 return response()->json(['message' => 'Keranjang tidak valid / kosong.'], 422);
+            }
+
+            $userId = $request->user()?->user_id ?? 0;
+            $lockKey = 'lock_store_order_' . $userId . '_' . md5(json_encode($cart));
+            if (! Cache::add($lockKey, true, 4)) {
+                return response()->json(['message' => 'Pesanan sedang diproses, harap tunggu sejenak.'], 429);
             }
 
             $storeId = (int) ($request->user()?->store_id ?? 0);
@@ -184,16 +194,39 @@ class KasirController extends Controller
                     ->exists();
             }
 
-            $items = $this->buildCartItems($cart, null, $skipStockCheck);
+            $storeId = (int) ($request->user()?->store_id ?? 0);
+            $items = $this->buildCartItems($cart, $storeId, $skipStockCheck);
 
-            $subtotal = (int) round(collect($items)->sum('subtotal'));
-            $qrisFee = (int) ceil($subtotal * 0.007);
-            $grossAmount = $subtotal + $qrisFee;
+            $itemDetails = [];
+            $calcSubtotal = 0;
+            foreach ($items as $item) {
+                $itemSubtotal = (int) round($item['subtotal']);
+                $calcSubtotal += $itemSubtotal;
+                $pName = mb_substr($item['product_name'] . ($item['variant'] && $item['variant'] !== '-' ? " ({$item['variant']})" : ''), 0, 50);
+                $itemDetails[] = [
+                    'id'       => (string) $item['product_id'],
+                    'price'    => $itemSubtotal,
+                    'quantity' => 1,
+                    'name'     => $pName,
+                ];
+            }
+
+            $qrisFee = (int) round($calcSubtotal * 0.007);
+            $grossAmount = $calcSubtotal + $qrisFee;
 
             if ($grossAmount < 1000) {
                 throw ValidationException::withMessages([
                     'total_amount' => 'Minimal pembayaran QRIS Rp 1.000.',
                 ]);
+            }
+
+            if ($qrisFee > 0) {
+                $itemDetails[] = [
+                    'id'       => 'FEE-QRIS',
+                    'price'    => $qrisFee,
+                    'quantity' => 1,
+                    'name'     => 'Biaya Layanan QRIS 0.7%',
+                ];
             }
 
             $transactionId = $request->input('transaction_id') ?? time();
@@ -209,28 +242,10 @@ class KasirController extends Controller
                 'phone' => $request->user()->phone ?? '08123456789',
             ];
 
-            $itemDetails = collect($items)->map(function ($item) {
-                return [
-                    'id' => (string) $item['product_id'],
-                    'price' => (int) $item['unit_price'],
-                    'quantity' => (int) $item['quantity'],
-                    'name' => "Product {$item['product_id']}",
-                ];
-            })->values()->all();
-
-            // Tambahkan item fee QRIS supaya nilai item_details = gross_amount
-            $itemDetails[] = [
-                'id' => 'FEE-QRIS',
-                'price' => $qrisFee,
-                'quantity' => 1,
-                'name' => 'Biaya Layanan QRIS 0.7%',
-            ];
-
             $params = [
                 'transaction_details' => $transactionDetails,
                 'customer_details' => $customerDetails,
                 'item_details' => $itemDetails,
-                // 'enabled_payments' => ['gopay'],
             ];
 
             $snapToken = Snap::getSnapToken($params);
@@ -265,6 +280,12 @@ class KasirController extends Controller
             throw ValidationException::withMessages([
                 'cart' => 'Keranjang kosong atau tidak valid.',
             ]);
+        }
+
+        $userId = $request->user()?->user_id ?? 0;
+        $lockKey = 'lock_checkout_' . $userId . '_' . md5($payload['cart']);
+        if (! Cache::add($lockKey, true, 4)) {
+            return response()->json(['message' => 'Transaksi sedang diproses, harap tunggu sejenak.'], 429);
         }
 
         $storeId = (int) ($request->user()?->store_id ?? 0);
@@ -427,7 +448,7 @@ class KasirController extends Controller
                 ]);
             }
 
-            if ($isDynamicPrice && $row['price'] > 0) {
+            if (isset($row['price']) && (float)$row['price'] > 0) {
                 $unitPrice = (float) $row['price'];
             } else {
                 $unitPrice = (float) ($product->selling_price ?? 0);
@@ -464,12 +485,46 @@ class KasirController extends Controller
      */
     private function decrementStockLevels(int $storeId, array $items): void
     {
+        $dynamicCategories = \App\Models\Category::where('is_dynamic_price', true)->get();
+
         foreach ($items as $item) {
             $productId = (int) ($item['product_id'] ?? 0);
             $quantity = (int) ($item['quantity'] ?? 0);
 
             if ($productId <= 0 || $quantity <= 0) {
                 continue;
+            }
+
+            $product = Product::query()->with('category')->find($productId);
+
+            // Cek apakah produk ini memiliki harga / stok dinamis
+            $isDynamicPrice = false;
+            if ($product) {
+                $isDynamicPrice = (bool) ($product->category?->is_dynamic_price ?? false);
+                if (! $isDynamicPrice) {
+                    $catId = $product->category_id;
+                    $prodName = $product->product_name;
+                    $catName = $product->category?->category_name ?? '';
+
+                    foreach ($dynamicCategories as $cat) {
+                        if ($catId == $cat->category_id) {
+                            $isDynamicPrice = true;
+                            break;
+                        }
+                        if (! empty($cat->keywords)) {
+                            $keywordsList = is_array($cat->keywords) ? $cat->keywords : json_decode($cat->keywords, true);
+                            if (! is_array($keywordsList)) {
+                                $keywordsList = array_map('trim', explode(',', $cat->keywords));
+                            }
+                            foreach ($keywordsList as $kw) {
+                                if ($kw !== '' && (stripos($prodName, $kw) !== false || stripos($catName, $kw) !== false)) {
+                                    $isDynamicPrice = true;
+                                    break 2;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             $stockLevel = StockLevel::query()
@@ -479,19 +534,28 @@ class KasirController extends Controller
                 ->first();
 
             if (! $stockLevel) {
-                throw ValidationException::withMessages([
-                    'cart' => 'Stok produk tidak ditemukan untuk salah satu item transaksi.',
-                ]);
+                if ($isDynamicPrice) {
+                    $stockLevel = StockLevel::create([
+                        'store_id'   => $storeId,
+                        'product_id' => $productId,
+                        'quantity'   => 0,
+                        'unit_price' => (float) ($item['unit_price'] ?? 0),
+                    ]);
+                } else {
+                    throw ValidationException::withMessages([
+                        'cart' => 'Stok produk tidak ditemukan untuk salah satu item transaksi.',
+                    ]);
+                }
             }
 
-            if ((int) $stockLevel->quantity < $quantity) {
+            if (! $isDynamicPrice && (int) $stockLevel->quantity < $quantity) {
                 throw ValidationException::withMessages([
                     'cart' => 'Stok ' . ($stockLevel->product?->product_name ?? 'produk') . ' tidak cukup. Sisa stok: ' . $stockLevel->quantity . '.',
                 ]);
             }
 
             $oldStock = (int) $stockLevel->quantity;
-            $stockLevel->quantity = (int) $stockLevel->quantity - $quantity;
+            $stockLevel->quantity = max(0, (int) $stockLevel->quantity - $quantity);
             $stockLevel->save();
 
             // Record stock log for sales
@@ -503,7 +567,7 @@ class KasirController extends Controller
                 'old_quantity'    => $oldStock,
                 'new_quantity'    => $stockLevel->quantity,
                 'quantity_change' => -$quantity,
-                'notes'           => 'Pengurangan stok penjualan',
+                'notes'           => 'Pengurangan stok penjualan' . ($isDynamicPrice ? ' (Stok Dinamis)' : ''),
             ]);
         }
     }
@@ -593,6 +657,11 @@ class KasirController extends Controller
 
         if ($transaction->status !== 'pending_payment') {
             return response()->json(['message' => 'Transaksi bukan pending payment.'], 422);
+        }
+
+        $lockKey = 'lock_pay_pending_' . $transaction->transaction_id;
+        if (! Cache::add($lockKey, true, 4)) {
+            return response()->json(['message' => 'Pembayaran transaksi ini sedang diproses, harap tunggu.'], 429);
         }
 
         $payload = $request->validate([
@@ -925,6 +994,55 @@ class KasirController extends Controller
         return response()->json([
             'message' => 'Produk baru berhasil ditambahkan.',
             'product' => $product,
+        ]);
+    }
+
+    public function updateProductImage(Request $request, Product $product)
+    {
+        abort_unless(in_array($request->user()?->role, ['owner', 'admin', 'cashier', 'pelayan'], true), 403);
+
+        $request->validate([
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
+            'image_base64' => ['nullable', 'string'],
+        ]);
+
+        $filePath = null;
+
+        if ($request->hasFile('image')) {
+            $filePath = $request->file('image')->store('products', 'public');
+        } elseif ($request->input('image_base64')) {
+            $base64String = $request->input('image_base64');
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64String, $type)) {
+                $data = substr($base64String, strpos($base64String, ',') + 1);
+                $type = strtolower($type[1]);
+                if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
+                    $type = 'png';
+                }
+                $data = base64_decode($data);
+                if ($data !== false) {
+                    $fileName = 'products/' . \Illuminate\Support\Str::random(40) . '.' . $type;
+                    \Illuminate\Support\Facades\Storage::disk('public')->put($fileName, $data);
+                    $filePath = $fileName;
+                }
+            }
+        }
+
+        if (!$filePath) {
+            return response()->json(['message' => 'Tidak ada file gambar atau foto kamera yang dikirim.'], 422);
+        }
+
+        // Remove old file if exists
+        if ($product->file_url && \Illuminate\Support\Facades\Storage::disk('public')->exists($product->file_url)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($product->file_url);
+        }
+
+        $product->file_url = $filePath;
+        $product->save();
+
+        return response()->json([
+            'message' => 'Foto produk berhasil diperbarui.',
+            'product_id' => $product->product_id,
+            'image_url' => asset('storage/' . $filePath),
         ]);
     }
 }

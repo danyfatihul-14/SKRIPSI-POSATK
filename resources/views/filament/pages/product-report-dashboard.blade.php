@@ -1,6 +1,12 @@
 <x-filament-panels::page>
     @php
-        $maxQty = collect($topRows)->max('qty') ?: 1;
+        $allTopProducts = collect($topRows)->sortByDesc('qty')->values()->all();
+        $totalTopProducts = count($allTopProducts);
+        $maxQty = collect($allTopProducts)->max('qty') ?: 1;
+        $topPages = $perPage > 0 ? (int)ceil($totalTopProducts / $perPage) : 1;
+        $topCurrentPage = min(max(1, $page ?? 1), max(1, $topPages));
+        $topOffset = ($topCurrentPage - 1) * $perPage;
+        $topProductsRange = array_slice($allTopProducts, $topOffset, $perPage);
     @endphp
 
     <style>
@@ -307,18 +313,23 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            @forelse($topRows as $row)
+                            @forelse($topProductsRange as $row)
                                 @php
                                     $percentage = ($row['qty'] / $maxQty) * 100;
                                     $badgeClass = 'badge-period-bulanan';
                                 @endphp
                                 <tr class="hover:bg-emerald-50/40 transition-colors">
-                                    <td class="px-6 py-4">
-                                        <span class="badge-period {{ $badgeClass }}">
-                                            {{ $row['periode'] }}
-                                        </span>
+                                    <td class="px-6 py-4 font-extrabold text-gray-400 text-sm text-center">
+                                        {{ $topOffset + $loop->iteration }}
                                     </td>
-                                    <td class="px-6 py-4 font-bold text-gray-800 text-sm">{{ $row['product_name'] }}</td>
+                                    <td class="px-6 py-4 font-bold text-gray-800 text-sm">
+                                        <div class="font-bold text-gray-900">{{ $row['product_name'] }}</div>
+                                        @if(!empty($row['variant']) && $row['variant'] !== '-')
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mt-1">
+                                                🏷️ Varian: {{ $row['variant'] }}
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="px-6 py-4 text-right font-extrabold text-gray-700 text-sm">
                                         {{ number_format($row['qty'], 0, ',', '.') }}
                                         <span class="text-gray-400 font-medium text-xs ml-1">{{ strtoupper($row['unit'] ?? 'PCS') }}</span>
@@ -351,12 +362,37 @@
                     </table>
                 </div>
 
-                {{-- Table footer --}}
-                <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between no-print">
-                    <span class="text-xs text-gray-400">
-                        Menampilkan <strong class="text-gray-600">{{ count($topRows) }}</strong> produk
+                {{-- Table footer with Pagination --}}
+                <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-wrap items-center justify-between gap-3 no-print">
+                    <span class="text-xs text-gray-500 font-medium">
+                        Menampilkan <strong class="text-gray-800">{{ $topOffset + 1 }}</strong> – <strong class="text-gray-800">{{ min($topOffset + $perPage, $totalTopProducts) }}</strong> dari <strong class="text-gray-800">{{ $totalTopProducts }}</strong> produk terjual
                     </span>
-                    <span class="text-xs text-gray-400">Batas: {{ $perPage }} baris</span>
+
+                    @if($topPages > 1)
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <button
+                            wire:click="$set('page', {{ max(1, $topCurrentPage - 1) }})"
+                            @disabled($topCurrentPage <= 1)
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                            ‹ Sebelumnya
+                        </button>
+
+                        @for($p = 1; $p <= $topPages; $p++)
+                            <button
+                                wire:click="$set('page', {{ $p }})"
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold transition {{ $topCurrentPage == $p ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100' }}">
+                                {{ $p }}
+                            </button>
+                        @endfor
+
+                        <button
+                            wire:click="$set('page', {{ min($topPages, $topCurrentPage + 1) }})"
+                            @disabled($topCurrentPage >= $topPages)
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                            Selanjutnya ›
+                        </button>
+                    </div>
+                    @endif
                 </div>
             </div>
 

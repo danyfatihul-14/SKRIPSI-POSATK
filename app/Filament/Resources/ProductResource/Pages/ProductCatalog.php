@@ -63,10 +63,12 @@ class ProductCatalog extends Page
 
     public function loadProducts(): void
     {
+        $currentStoreId = $this->storeId ? (int) $this->storeId : null;
+
         $baseQuery = \App\Models\Product::query()->with('category');
-        if ($this->storeId) {
-            $baseQuery->whereHas('stockLevels', function ($q) {
-                $q->where('store_id', $this->storeId);
+        if ($currentStoreId) {
+            $baseQuery->whereHas('stockLevels', function ($q) use ($currentStoreId) {
+                $q->where('store_id', $currentStoreId);
             });
         }
 
@@ -88,24 +90,30 @@ class ProductCatalog extends Page
         })->count();
 
         $query = \App\Models\Product::query()
-            ->with(['category', 'stockLevels' => function ($q) {
-                if ($this->storeId) {
-                    $q->where('store_id', $this->storeId);
+            ->with(['category', 'stockLevels' => function ($q) use ($currentStoreId) {
+                if ($currentStoreId) {
+                    $q->where('store_id', $currentStoreId);
                 }
             }]);
 
         // Filter produk yang ada di store yang dipilih
-        if ($this->storeId) {
-            $query->whereHas('stockLevels', function ($q) {
-                $q->where('store_id', $this->storeId);
+        if ($currentStoreId) {
+            $query->whereHas('stockLevels', function ($q) use ($currentStoreId) {
+                $q->where('store_id', $currentStoreId);
             });
         }
 
         if (!empty($this->search)) {
-            $q = $this->search;
+            $q = trim($this->search);
             $query->where(function ($sub) use ($q) {
                 $sub->where('product_name', 'like', "%{$q}%")
-                    ->orWhere('variant', 'like', "%{$q}%");
+                    ->orWhere('variant', 'like', "%{$q}%")
+                    ->orWhereHas('category', function ($catQuery) use ($q) {
+                        $catQuery->where('category_name', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('stockLevels.store', function ($storeQuery) use ($q) {
+                        $storeQuery->where('name_store', 'like', "%{$q}%");
+                    });
             });
         }
 
@@ -138,8 +146,10 @@ class ProductCatalog extends Page
             });
         }
 
-        $this->products = $query->get()->map(function ($product) {
-            $stockLevel = $product->stockLevels->first();
+        $this->products = $query->get()->map(function ($product) use ($currentStoreId) {
+            $stockLevel = $currentStoreId
+                ? $product->stockLevels->firstWhere('store_id', $currentStoreId)
+                : $product->stockLevels->first();
             $isDynamic = (bool) ($product->category?->is_dynamic_price ?? false);
 
             $missing = [];

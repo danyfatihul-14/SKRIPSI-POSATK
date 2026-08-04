@@ -92,10 +92,23 @@
         });
     }
 
+    let isSubmittingOrder = false;
+
     function submitOrderToCashier(options = {}) {
+        if (isSubmittingOrder) return;
         if (!cart.length) {
             window.showAlert('Keranjang masih kosong.', 'warning');
             return;
+        }
+
+        isSubmittingOrder = true;
+
+        const btnSubmit = document.querySelector('#cartFooter button[onclick*="submitOrderToCashier"]');
+        const origText = btnSubmit ? btnSubmit.innerText : '';
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = 'Mengirim Pesanan...';
+            btnSubmit.style.opacity = '0.6';
         }
 
         const redirectPage = options.redirectPage || 'kasir';
@@ -143,7 +156,15 @@
                     window.showAlert('Error: ' + JSON.stringify(data.errors), 'error');
                 }
             })
-            .catch(e => window.showAlert('Fetch error: ' + e.message, 'error'));
+            .catch(e => window.showAlert('Fetch error: ' + e.message, 'error'))
+            .finally(() => {
+                isSubmittingOrder = false;
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerText = origText;
+                    btnSubmit.style.opacity = '1';
+                }
+            });
     }
 
     // heldCarts is declared globally in kasir scripts
