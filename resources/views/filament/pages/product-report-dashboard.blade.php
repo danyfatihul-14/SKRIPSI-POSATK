@@ -411,31 +411,24 @@
     @endphp
 
     <script>
-        window.__productChartData = @json($productChartData);
-    </script>
-
-    <script>
         (() => {
             let topChart = null;
 
-            function getChartData() {
-                return window.__productChartData ?? { labels: [], qty: [] };
-            }
-
-            function renderChart() {
+            function initChart(labels, qty) {
                 const el = document.getElementById('topProductChart');
                 if (!el || typeof Chart === 'undefined') return;
 
-                const { labels, qty } = getChartData();
-                if (topChart) topChart.destroy();
+                if (topChart) {
+                    topChart.destroy();
+                }
 
                 topChart = new Chart(el, {
                     type: 'bar',
                     data: {
-                        labels,
+                        labels: labels || [],
                         datasets: [{
                             label: 'Kuantitas Terjual',
-                            data: qty,
+                            data: qty || [],
                             backgroundColor: '#10b981',
                             borderRadius: 6,
                             barPercentage: 0.6
@@ -453,9 +446,26 @@
                 });
             }
 
-            document.addEventListener('DOMContentLoaded', renderChart);
-            document.addEventListener('livewire:navigated', renderChart);
-            document.addEventListener('product-data-updated', renderChart);
+            const initialData = @json($productChartData);
+            
+            function renderInitial() {
+                initChart(initialData.labels, initialData.qty);
+            }
+
+            document.addEventListener('DOMContentLoaded', renderInitial);
+            document.addEventListener('livewire:navigated', renderInitial);
+
+            window.addEventListener('product-chart-updated', (e) => {
+                const detail = e.detail || {};
+                initChart(detail.labels || [], detail.qty || []);
+            });
+
+            document.addEventListener('livewire:init', () => {
+                Livewire.on('product-chart-updated', (payload) => {
+                    const data = Array.isArray(payload) ? (payload[0] || {}) : payload;
+                    initChart(data.labels || [], data.qty || []);
+                });
+            });
         })();
     </script>
 

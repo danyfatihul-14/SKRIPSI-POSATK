@@ -58,6 +58,7 @@ class ProductReportDashboard extends Page
         $this->page = 1;
         $this->loadTopProductChartData();
         $this->loadTopRows();
+        $this->dispatch('product-chart-updated', labels: $this->topProductLabels, qty: $this->topProductQty);
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────

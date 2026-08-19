@@ -83,12 +83,22 @@
         return total;
     }
 
+    function deduplicateProductsList(list) {
+        if (!Array.isArray(list)) return [];
+        const map = new Map();
+        list.forEach(p => {
+            const key = p.product_id ? String(p.product_id) : (p.product_name + '||' + (p.variant || '-') + '||' + (p.unit || '-')).toLowerCase();
+            if (!map.has(key)) map.set(key, p);
+        });
+        return Array.from(map.values());
+    }
+
     function fetchProducts(keyword = '') {
         fetch('/kasir/search?q=' + encodeURIComponent(keyword))
             .then(r => r.json())
             .then(data => {
-                products = data;
-                renderProducts(data);
+                products = deduplicateProductsList(data);
+                renderProducts(products);
             });
     }
 
@@ -655,8 +665,17 @@
     let selectedVariantId = null;
 
     window.openVariantModal = function(productName) {
-        currentVariants = products.filter(p => p.product_name === productName)
-                                  .sort((a, b) => parseFloat(a.selling_price || 0) - parseFloat(b.selling_price || 0));
+        const rawVariants = products.filter(p => p.product_name === productName);
+        const seenV = new Set();
+        currentVariants = [];
+        rawVariants.forEach(p => {
+            const vKey = (p.variant || '-').trim().toLowerCase() + '||' + (p.unit || '-').trim().toLowerCase();
+            if (!seenV.has(vKey)) {
+                seenV.add(vKey);
+                currentVariants.push(p);
+            }
+        });
+        currentVariants.sort((a, b) => parseFloat(a.selling_price || 0) - parseFloat(b.selling_price || 0));
         if (currentVariants.length === 0) return;
 
         // Select the first variant that has available stock > 0 or is dynamic price, otherwise select the first variant
@@ -1014,6 +1033,13 @@
     window.submitNewProduct = function(event) {
         event.preventDefault();
         
+        const btnSubmit = event.target.querySelector('button[type="submit"]');
+        const origText = btnSubmit ? btnSubmit.innerText : 'Simpan';
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = '⏳ Menyimpan...';
+        }
+        
         const productName = document.getElementById('addProductName').value;
         const categoryId = document.getElementById('addProductCategory').value;
         const variant = document.getElementById('addProductVariant').value;
@@ -1070,6 +1096,12 @@
         .catch(err => {
             console.error(err);
             window.showAlert(err.message, 'error');
+        })
+        .finally(() => {
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = origText;
+            }
         });
     }
 
@@ -1551,11 +1583,16 @@
 
             if (!res.ok) throw new Error(data?.message || 'Gagal mengunggah foto.');
 
-            window.showAlert('Foto produk berhasil diperbarui!', 'success');
+            window.showAlert(data?.message || 'Foto produk dan seluruh variansinya berhasil diperbarui!', 'success');
 
-            const prod = products.find(p => p.product_id == productId);
-            if (prod && data.image_url) {
-                prod.image_url = data.image_url;
+            const targetProd = products.find(p => p.product_id == productId);
+            const targetName = data.product_name || (targetProd ? targetProd.product_name : null);
+            if (targetName && data.image_url) {
+                products.forEach(p => {
+                    if (p.product_name === targetName) {
+                        p.image_url = data.image_url;
+                    }
+                });
             }
 
             renderProducts(products);

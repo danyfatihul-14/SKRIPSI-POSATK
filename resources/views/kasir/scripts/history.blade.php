@@ -86,7 +86,8 @@
                 <div class="history-item-meta">
                     <span>${formatDateTime(txn.created_at)}</span>
                     <span>${txn.payment_method ? txn.payment_method.toUpperCase() : 'CASH'}</span>
-                    <span>${txn.served_by || '-'}</span>
+                    <span>Kasir: ${txn.cashier_name || txn.served_by || '-'}</span>
+                    ${txn.waiter_name && txn.waiter_name !== '-' ? `<span>Pelayan: ${txn.waiter_name}</span>` : ''}
                 </div>
                 <div class="history-item-customer">
                     <strong>Pembeli:</strong> ${escapeHtml(txn.customer_name || 'Pelanggan Umum')}
@@ -111,13 +112,15 @@
         } else {
             filteredTransactions = allTransactions.filter(txn => {
                 const id = String(txn.transaction_id || txn.id || txn.transaction_code || '').toLowerCase();
-                const cashier = String(txn.served_by || '').toLowerCase();
+                const cashier = String(txn.cashier_name || txn.served_by || '').toLowerCase();
+                const waiter = String(txn.waiter_name || '').toLowerCase();
                 const method = String(txn.payment_method || '').toLowerCase();
                 const notes = String(txn.notes || '').toLowerCase();
                 const customer = String(txn.customer_name || '').toLowerCase();
                 
                 return id.includes(searchTerm) || 
                        cashier.includes(searchTerm) || 
+                       waiter.includes(searchTerm) || 
                        method.includes(searchTerm) ||
                        notes.includes(searchTerm) ||
                        customer.includes(searchTerm);
@@ -167,7 +170,8 @@
                 <div><strong>ID Transaksi:</strong> #${txn.transaction_code || txn.transaction_id || txn.id}</div>
                 <div><strong>Tanggal:</strong> ${formatDateTime(txn.created_at)}</div>
                 <div><strong>Metode Pembayaran:</strong> ${txn.payment_method ? txn.payment_method.toUpperCase() : 'CASH'}</div>
-                <div><strong>Kasir:</strong> ${txn.served_by || '-'}</div>
+                <div><strong>Kasir:</strong> ${escapeHtml(txn.cashier_name || txn.served_by || '-')}</div>
+                <div><strong>Pelayan:</strong> ${escapeHtml(txn.waiter_name || '-')}</div>
                 <div><strong>Pembeli:</strong> ${escapeHtml(txn.customer_name || 'Pelanggan Umum')}</div>
                 <div><strong>Status:</strong> ${txn.status === 'pending' ? 'Menunggu' : 'Selesai'}</div>
                 <div style="grid-column: 1 / -1;"><strong>Catatan/Notes:</strong> ${escapeHtml(txn.notes || '-')}</div>

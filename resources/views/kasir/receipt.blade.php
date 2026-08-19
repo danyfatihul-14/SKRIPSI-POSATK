@@ -482,7 +482,10 @@
             <div class="thermal-code">{{ $transaction->transaction_code }}</div>
             <div class="thermal-datetime">
                 {{ optional($transaction->created_at)->timezone('Asia/Jakarta')->format('d/m/Y H:i') }}<br>
-                Kasir: {{ $transaction->user?->name ?? '-' }}<br>
+                Kasir: {{ $transaction->cashier_name }}<br>
+                @if($transaction->waiter_name !== '-')
+                Pelayan: {{ $transaction->waiter_name }}<br>
+                @endif
                 Pembeli: {{ $transaction->customer_name ?? 'Pelanggan Umum' }}
             </div>
 

@@ -127,6 +127,8 @@ class KasirController extends Controller
                 $transaction = Transaction::create([
                     'store_id'       => $request->user()->store_id,
                     'user_id'        => $request->user()->user_id,
+                    'waiter_id'      => $request->user()->role === 'pelayan' ? $request->user()->user_id : null,
+                    'cashier_id'     => in_array($request->user()->role, ['cashier', 'owner', 'admin']) ? $request->user()->user_id : null,
                     'subtotal'       => $subtotal,
                     'tax'            => 0,
                     'discount'       => 0,
@@ -311,6 +313,8 @@ class KasirController extends Controller
             $transaction = Transaction::create([
                 'store_id'       => $request->user()->store_id,
                 'user_id'        => $request->user()->user_id,
+                'waiter_id'      => $request->user()->role === 'pelayan' ? $request->user()->user_id : null,
+                'cashier_id'     => in_array($request->user()->role, ['cashier', 'owner', 'admin']) ? $request->user()->user_id : null,
                 'subtotal'       => $subtotal,
                 'tax'            => 0,
                 'discount'       => 0,
@@ -686,6 +690,7 @@ class KasirController extends Controller
                 'payment_method' => $payload['payment_method'],
                 'cash_paid' => $cashPaid,
                 'cash_change' => $cashChange,
+                'cashier_id' => $request->user()->user_id,
                 'customer_name' => $payload['customer_name'] ?? $transaction->customer_name ?? 'Pelanggan Umum',
                 'notes' => trim(($transaction->notes ?? '') . ' | Dibayar [' . $request->user()->name . ']: ' . now('Asia/Jakarta')->format('Y-m-d H:i:s')),
             ]);
@@ -733,7 +738,9 @@ class KasirController extends Controller
         abort_unless(in_array($request->user()?->role, ['cashier', 'admin'], true), 403);
 
         $transaction->load([
-            'user:user_id,name',
+            'user:user_id,name,role',
+            'waiter:user_id,name',
+            'cashier:user_id,name',
             'items.product:product_id,product_name',
             'store',
         ]);
@@ -750,12 +757,15 @@ class KasirController extends Controller
         $storeId = $request->user()?->store_id;
 
         $query = Transaction::query()
-            ->with(['user:user_id,name', 'items.product:product_id,product_name'])
+            ->with(['user:user_id,name,role', 'waiter:user_id,name', 'cashier:user_id,name', 'items.product:product_id,product_name'])
             ->where('store_id', $storeId)
             ->where('status', 'completed');
 
         if ($request->user()?->role === 'pelayan') {
-            $query->where('user_id', $request->user()->user_id);
+            $query->where(function ($q) use ($request) {
+                $q->where('user_id', $request->user()->user_id)
+                  ->orWhere('waiter_id', $request->user()->user_id);
+            });
         }
 
         $transactions = $query
@@ -771,7 +781,9 @@ class KasirController extends Controller
                     'payment_method' => $txn->payment_method,
                     'status' => $txn->status,
                     'created_at' => $txn->created_at?->toIso8601String(),
-                    'served_by' => $txn->user?->name ?? '-',
+                    'served_by' => $txn->cashier_name,
+                    'cashier_name' => $txn->cashier_name,
+                    'waiter_name' => $txn->waiter_name,
                     'customer_name' => $txn->customer_name ?? 'Pelanggan Umum',
                     'notes' => $txn->notes,
                     'receipt_url' => route('kasir.receipt', $txn->transaction_id),
@@ -951,17 +963,42 @@ class KasirController extends Controller
             return response()->json(['message' => 'User tidak terasosiasi dengan Store mana pun.'], 422);
         }
 
+        $productName = trim($request->input('product_name'));
+        $variant = trim($request->input('variant') ?: '-');
+        $unit = trim($request->input('unit') ?: '-');
+
+        // Check if exact same product_name and variant already exists (case-insensitive & trimmed)
+        $existingProduct = Product::whereRaw('LOWER(TRIM(product_name)) = ?', [mb_strtolower($productName)])
+            ->whereRaw('LOWER(TRIM(variant)) = ?', [mb_strtolower($variant)])
+            ->first();
+
+        if ($existingProduct) {
+            $variantText = ($variant !== '' && $variant !== '-') ? " dengan variasi '{$variant}'" : "";
+            return response()->json([
+                'message' => "Produk '{$productName}'{$variantText} sudah ada di sistem! Silakan gunakan nama variasi lain.",
+            ], 422);
+        }
+
         $fileUrl = null;
         if ($request->hasFile('image')) {
             $fileUrl = $request->file('image')->store('products', 'public');
+        } else {
+            // Inherit existing variant image if available
+            $existingImage = Product::whereRaw('LOWER(TRIM(product_name)) = ?', [mb_strtolower($productName)])
+                ->whereNotNull('file_url')
+                ->where('file_url', '!=', '')
+                ->value('file_url');
+            if ($existingImage) {
+                $fileUrl = $existingImage;
+            }
         }
 
-        $product = DB::transaction(function () use ($request, $storeId, $fileUrl) {
+        $product = DB::transaction(function () use ($request, $storeId, $productName, $variant, $unit, $fileUrl) {
             $product = Product::create([
                 'category_id'    => $request->input('category_id'),
-                'product_name'  => $request->input('product_name'),
-                'variant'       => $request->input('variant') ?: '-',
-                'unit'          => $request->input('unit') ?: '-',
+                'product_name'  => $productName,
+                'variant'       => $variant,
+                'unit'          => $unit,
                 'purchase_price'=> 0,
                 'selling_price' => $request->input('selling_price'),
                 'file_url'      => $fileUrl,
@@ -991,9 +1028,23 @@ class KasirController extends Controller
             return $product;
         });
 
+        // Format product data for frontend response
+        $stockLvl = StockLevel::where('store_id', $storeId)->where('product_id', $product->product_id)->first();
+        $formattedProduct = [
+            'product_id'    => $product->product_id,
+            'product_name'  => $product->product_name,
+            'variant'       => $product->variant,
+            'unit'          => $product->unit,
+            'selling_price' => (float) $product->selling_price,
+            'file_url'      => $product->file_url,
+            'image_url'     => $product->file_url ? asset('storage/' . $product->file_url) : null,
+            'stock'         => (int) ($stockLvl?->quantity ?? 0),
+            'discount'      => (float) ($stockLvl?->discount ?? 0),
+        ];
+
         return response()->json([
             'message' => 'Produk baru berhasil ditambahkan.',
-            'product' => $product,
+            'product' => $formattedProduct,
         ]);
     }
 
@@ -1031,18 +1082,140 @@ class KasirController extends Controller
             return response()->json(['message' => 'Tidak ada file gambar atau foto kamera yang dikirim.'], 422);
         }
 
-        // Remove old file if exists
-        if ($product->file_url && \Illuminate\Support\Facades\Storage::disk('public')->exists($product->file_url)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($product->file_url);
-        }
-
-        $product->file_url = $filePath;
-        $product->save();
+        // Update image for this product and all its variants (same product_name)
+        Product::where('product_name', $product->product_name)->update(['file_url' => $filePath]);
 
         return response()->json([
-            'message' => 'Foto produk berhasil diperbarui.',
+            'message' => 'Foto produk dan seluruh variansinya berhasil diperbarui.',
             'product_id' => $product->product_id,
+            'product_name' => $product->product_name,
             'image_url' => asset('storage/' . $filePath),
+        ]);
+    }
+
+    public function closingReport(Request $request)
+    {
+        abort_unless(in_array($request->user()?->role, ['cashier', 'admin', 'owner'], true), 403);
+
+        $date = $request->input('date', date('Y-m-d'));
+        $storeId = $request->user()->store_id;
+        $userId = $request->user()->user_id;
+
+        $query = Transaction::query()
+            ->with(['items.product:product_id,product_name,variant', 'waiter:user_id,name'])
+            ->where('store_id', $storeId)
+            ->where('status', 'completed')
+            ->whereDate('created_at', $date)
+            ->where(function ($q) use ($userId) {
+                $q->where('cashier_id', $userId)
+                  ->orWhere(function ($q2) use ($userId) {
+                      $q2->whereNull('cashier_id')->where('user_id', $userId);
+                  });
+            });
+
+        $transactions = $query->orderBy('created_at', 'desc')->get();
+
+        $totalCount = $transactions->count();
+        $totalAmount = (float) $transactions->sum('total_amount');
+        
+        $cashTransactions = $transactions->filter(fn($t) => strtolower($t->payment_method ?? '') === 'cash');
+        $qrisTransactions = $transactions->filter(fn($t) => strtolower($t->payment_method ?? '') === 'qris');
+
+        $totalCash = (float) $cashTransactions->sum('total_amount');
+        $totalQris = (float) $qrisTransactions->sum('total_amount');
+
+        // Summarize items sold
+        $productSummaryMap = [];
+        $totalQtySold = 0;
+
+        foreach ($transactions as $t) {
+            foreach ($t->items as $item) {
+                $pName = $item->product?->product_name ?? 'Produk';
+                $vName = trim($item->product?->variant ?? '');
+                $key = $pName . ($vName !== '' && $vName !== '-' ? " ({$vName})" : '');
+                
+                if (!isset($productSummaryMap[$key])) {
+                    $productSummaryMap[$key] = [
+                        'name' => $key,
+                        'qty' => 0,
+                        'subtotal' => 0.0,
+                    ];
+                }
+                $productSummaryMap[$key]['qty'] += (int) $item->quantity;
+                $productSummaryMap[$key]['subtotal'] += (float) $item->subtotal;
+                $totalQtySold += (int) $item->quantity;
+            }
+        }
+
+        usort($productSummaryMap, fn($a, $b) => $b['qty'] <=> $a['qty']);
+
+        return response()->json([
+            'status' => 'success',
+            'cashier_name' => $request->user()->name,
+            'store_name' => $request->user()->store?->name_store ?? 'Toko Intan',
+            'date' => $date,
+            'formatted_date' => \Carbon\Carbon::parse($date)->translatedFormat('d F Y'),
+            'total_transactions' => $totalCount,
+            'total_amount' => $totalAmount,
+            'total_cash' => $totalCash,
+            'total_qris' => $totalQris,
+            'total_qty_sold' => $totalQtySold,
+            'products_summary' => array_values($productSummaryMap),
+            'transactions' => $transactions->map(fn($t) => [
+                'transaction_id' => $t->transaction_id,
+                'transaction_code' => $t->transaction_code,
+                'created_at' => $t->created_at?->format('H:i:s'),
+                'payment_method' => strtoupper($t->payment_method ?? 'CASH'),
+                'customer_name' => $t->customer_name ?? 'Pelanggan Umum',
+                'waiter_name' => $t->waiter_name,
+                'total_amount' => (float) $t->total_amount,
+                'cash_paid' => (float) ($t->cash_paid ?? $t->total_amount),
+                'cash_change' => (float) ($t->cash_change ?? 0),
+            ]),
+        ]);
+    }
+
+    public function closingReceipt(Request $request)
+    {
+        abort_unless(in_array($request->user()?->role, ['cashier', 'admin', 'owner'], true), 403);
+
+        $date = $request->input('date', date('Y-m-d'));
+        $storeId = $request->user()->store_id;
+        $userId = $request->user()->user_id;
+
+        $query = Transaction::query()
+            ->with(['items.product:product_id,product_name,variant', 'waiter:user_id,name'])
+            ->where('store_id', $storeId)
+            ->where('status', 'completed')
+            ->whereDate('created_at', $date)
+            ->where(function ($q) use ($userId) {
+                $q->where('cashier_id', $userId)
+                  ->orWhere(function ($q2) use ($userId) {
+                      $q2->whereNull('cashier_id')->where('user_id', $userId);
+                  });
+            });
+
+        $transactions = $query->orderBy('created_at', 'asc')->get();
+
+        $totalCount = $transactions->count();
+        $totalAmount = (float) $transactions->sum('total_amount');
+        
+        $cashTransactions = $transactions->filter(fn($t) => strtolower($t->payment_method ?? '') === 'cash');
+        $qrisTransactions = $transactions->filter(fn($t) => strtolower($t->payment_method ?? '') === 'qris');
+
+        $totalCash = (float) $cashTransactions->sum('total_amount');
+        $totalQris = (float) $qrisTransactions->sum('total_amount');
+
+        return view('kasir.closing_receipt', [
+            'cashier' => $request->user(),
+            'store' => $request->user()->store,
+            'date' => $date,
+            'formatted_date' => \Carbon\Carbon::parse($date)->translatedFormat('d F Y'),
+            'totalCount' => $totalCount,
+            'totalAmount' => $totalAmount,
+            'totalCash' => $totalCash,
+            'totalQris' => $totalQris,
+            'transactions' => $transactions,
         ]);
     }
 }

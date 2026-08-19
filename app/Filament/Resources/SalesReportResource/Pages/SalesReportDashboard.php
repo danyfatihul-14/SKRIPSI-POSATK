@@ -18,6 +18,8 @@ class SalesReportDashboard extends Page
     public ?int $storeId = null;
     public array $stores = [];
     public int $perPage = 10;
+    public int $currentPage = 1;
+    public int $totalTransactionsCount = 0;
     public int $topProductsPerPage = 10;
     public int $topProductsPage = 1;
     public array $summaryRows = [];
@@ -68,11 +70,19 @@ class SalesReportDashboard extends Page
 
     public function updatedPerPage(): void
     {
+        $this->currentPage = 1;
+        $this->loadRecentTransactions();
+    }
+
+    public function setPage(int $page): void
+    {
+        $this->currentPage = max(1, $page);
         $this->loadRecentTransactions();
     }
 
     public function refreshData(): void
     {
+        $this->currentPage = 1;
         $this->summaryRows = [];
         $this->topRows = [];
         $this->recentTransactions = [];
@@ -132,67 +142,47 @@ class SalesReportDashboard extends Page
     {
         if (!Schema::hasTable('transactions')) {
             $this->recentTransactions = [];
+            $this->totalTransactionsCount = 0;
             return;
         }
 
-        $trxIdCol = $this->firstExistingColumn('transactions', ['transaction_id', 'id']) ?? 'transaction_id';
-        $codeCol = $this->firstExistingColumn('transactions', ['transaction_code', 'code']) ?? $trxIdCol;
-        $totalCol = $this->firstExistingColumn('transactions', ['total_amount', 'grand_total', 'total', 'final_total', 'amount']) ?? 'total_amount';
-        $methodCol = $this->firstExistingColumn('transactions', ['payment_method', 'payment_type', 'method']) ?? 'payment_method';
+        $query = \App\Models\Transaction::query()
+            ->with(['user:user_id,name,role', 'waiter:user_id,name', 'cashier:user_id,name'])
+            ->whereIn('status', ['completed', 'paid', 'success', 'selesai']);
 
-        $q = DB::table('transactions as t');
-
-        $storeId = $this->storeId;
-        if ($storeId) {
-            $q->where('t.store_id', $storeId);
+        if ($this->storeId) {
+            $query->where('store_id', $this->storeId);
         }
 
         if ($this->startDate) {
-            $q->whereDate('t.created_at', '>=', $this->startDate);
+            $query->whereDate('created_at', '>=', $this->startDate);
         }
         if ($this->endDate) {
-            $q->whereDate('t.created_at', '<=', $this->endDate);
+            $query->whereDate('created_at', '<=', $this->endDate);
         }
 
-        if (Schema::hasTable('users') && Schema::hasColumn('transactions', 'user_id') && Schema::hasColumn('users', 'user_id')) {
-            $q->leftJoin('users as u', 'u.user_id', '=', 't.user_id');
-
-            if (Schema::hasColumn('users', 'name')) {
-                $q->selectRaw('u.name');
-            } elseif (Schema::hasColumn('users', 'username')) {
-                $q->selectRaw('u.username');
-            }
+        $this->totalTransactionsCount = $query->count();
+        
+        $totalPages = max(1, (int) ceil($this->totalTransactionsCount / $this->perPage));
+        if ($this->currentPage > $totalPages) {
+            $this->currentPage = $totalPages;
         }
 
-        $q->selectRaw("t.$trxIdCol as id")
-            ->selectRaw("t.$codeCol as code")
-            ->selectRaw("t.created_at as created_at")
-            ->selectRaw("t.$totalCol as total")
-            ->selectRaw("t.$methodCol as method");
-
-        if (Schema::hasColumn('transactions', 'status')) {
-            $q->whereIn('t.status', ['completed', 'paid', 'success', 'selesai']);
-        }
-
-        $rows = $q->orderByDesc('t.created_at')->limit($this->perPage)->get();
+        $rows = $query->orderByDesc('created_at')
+            ->skip(($this->currentPage - 1) * $this->perPage)
+            ->take($this->perPage)
+            ->get();
 
         $this->recentTransactions = $rows->map(function ($x) {
-            $cashier = '-';
-
-            // Cek name atau username dari join
-            if (!empty($x->name)) {
-                $cashier = $x->name;
-            } elseif (!empty($x->username)) {
-                $cashier = $x->username;
-            }
-
             return [
-                'id' => (string) $x->id,
-                'code' => (string) $x->code,
+                'id' => (string) $x->transaction_id,
+                'code' => (string) $x->transaction_code,
                 'time' => Carbon::parse($x->created_at)->format('d/m/Y H:i:s'),
-                'cashier' => $cashier,
-                'method' => strtoupper((string) ($x->method ?? '-')),
-                'total' => (float) ($x->total ?? 0),
+                'cashier' => $x->cashier_name,
+                'waiter' => $x->waiter_name,
+                'customer' => $x->customer_name ?? 'Pelanggan Umum',
+                'method' => strtoupper((string) ($x->payment_method ?? '-')),
+                'total' => (float) ($x->total_amount ?? 0),
             ];
         })->toArray();
     }

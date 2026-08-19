@@ -700,6 +700,16 @@
                         <span class="nav-desc">Cetak QR Masal</span>
                     </div>
                 </button>
+
+                <button onclick="showPage('closing')" id="nav-closing" class="nav-link">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:18px; height:18px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div>
+                        <span style="display:block; font-size:14px;">Closing Shift</span>
+                        <span class="nav-desc">Laporan Sales Shift</span>
+                    </div>
+                </button>
                 @endif
 
             </nav>
@@ -733,6 +743,7 @@
             @include('kasir.pages.stok')
             @include('kasir.pages.history')
             @include('kasir.pages.cetak-qr')
+            @include('kasir.pages.closing')
             @endif
         </div>
 
@@ -840,6 +851,7 @@
     @if (! $isWaiter)
     @include('kasir.scripts.pending')
     @include('kasir.scripts.transaksi')
+    @include('kasir.scripts.closing')
     @endif
     @include('kasir.scripts.history')
 
@@ -884,6 +896,9 @@
             }
             if (page === 'cetak-qr' && typeof renderQrProducts === 'function') {
                 renderQrProducts(products);
+            }
+            if (page === 'closing' && typeof loadClosingReport === 'function') {
+                loadClosingReport();
             }
             if (window.matchMedia('(max-width: 900px)').matches) {
                 closeMobileSidebar();

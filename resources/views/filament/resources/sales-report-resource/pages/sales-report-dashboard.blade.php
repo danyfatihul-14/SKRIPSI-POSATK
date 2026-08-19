@@ -691,8 +691,10 @@
                             <tr>
                                 <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Kode Struk</th>
                                 <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Tanggal & Waktu</th>
-                                <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Melayani (Kasir)</th>
-                                <th class="px-6 py-3.5 text-center font-bold text-gray-600 text-xs uppercase tracking-wide w-36">Metode Pembayaran</th>
+                                <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Kasir</th>
+                                <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Pelayan</th>
+                                <th class="px-6 py-3.5 text-left font-bold text-gray-600 text-xs uppercase tracking-wide">Pembeli</th>
+                                <th class="px-6 py-3.5 text-center font-bold text-gray-600 text-xs uppercase tracking-wide w-36">Metode</th>
                                 <th class="px-6 py-3.5 text-right font-bold text-gray-600 text-xs uppercase tracking-wide">Total Belanja</th>
                                 <th class="px-6 py-3.5 text-center font-bold text-gray-600 text-xs uppercase tracking-wide w-28 no-print">Aksi</th>
                             </tr>
@@ -702,7 +704,9 @@
                             <tr class="hover:bg-blue-50/40 transition-colors">
                                 <td class="px-6 py-4 font-bold text-blue-600 text-sm">{{ $trx['code'] }}</td>
                                 <td class="px-6 py-4 text-gray-500 text-sm">{{ $trx['time'] }}</td>
-                                <td class="px-6 py-4 font-semibold text-gray-700 text-sm">{{ $trx['cashier'] }}</td>
+                                <td class="px-6 py-4 font-semibold text-gray-800 text-sm">{{ $trx['cashier'] ?? '-' }}</td>
+                                <td class="px-6 py-4 font-semibold text-emerald-700 text-sm">{{ $trx['waiter'] ?? '-' }}</td>
+                                <td class="px-6 py-4 text-gray-600 text-sm">{{ $trx['customer'] ?? 'Pelanggan Umum' }}</td>
                                 <td class="px-6 py-4 text-center">
                                     <span class="badge-method {{ $trx['method'] === 'QRIS' ? 'badge-method-qris' : 'badge-method-cash' }}">
                                         {{ $trx['method'] }}
@@ -719,7 +723,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-400">
+                                <td colspan="8" class="px-6 py-12 text-center text-gray-400">
                                     <div class="flex flex-col items-center gap-2">
                                         <span class="text-3xl">📭</span>
                                         <span class="font-medium">Belum ada transaksi terekam</span>
@@ -730,12 +734,62 @@
                         </tbody>
                     </table>
                 </div>
-                {{-- Footer info --}}
-                <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between no-print">
-                    <span class="text-xs text-gray-400">
-                        Menampilkan <strong class="text-gray-600">{{ count($recentTransactions) }}</strong> transaksi terbaru
+                {{-- Footer info with Pagination --}}
+                <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-wrap items-center justify-between gap-3 no-print">
+                    @php
+                        $startOffset = $totalTransactionsCount > 0 ? (($currentPage - 1) * $perPage + 1) : 0;
+                        $endOffset = min($currentPage * $perPage, $totalTransactionsCount);
+                        $totalPages = max(1, (int) ceil($totalTransactionsCount / $perPage));
+                    @endphp
+
+                    <span class="text-xs text-gray-500 font-medium">
+                        Menampilkan <strong class="text-gray-800">{{ number_format($startOffset, 0, ',', '.') }}</strong> – <strong class="text-gray-800">{{ number_format($endOffset, 0, ',', '.') }}</strong> dari <strong class="text-gray-800">{{ number_format($totalTransactionsCount, 0, ',', '.') }}</strong> transaksi
                     </span>
-                    <span class="text-xs text-gray-400">Batas: {{ $perPage }} baris</span>
+
+                    @if($totalPages > 1)
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <button
+                            wire:click="setPage({{ max(1, $currentPage - 1) }})"
+                            @disabled($currentPage <= 1)
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                            ‹ Sebelumnya
+                        </button>
+
+                        @php
+                            $startP = max(1, $currentPage - 2);
+                            $endP = min($totalPages, $currentPage + 2);
+                        @endphp
+
+                        @if($startP > 1)
+                            <button wire:click="setPage(1)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100">1</button>
+                            @if($startP > 2)
+                                <span class="px-1 text-gray-400 text-xs">...</span>
+                            @endif
+                        @endif
+
+                        @for($p = $startP; $p <= $endP; $p++)
+                            <button
+                                wire:click="setPage({{ $p }})"
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold transition {{ $currentPage == $p ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100' }}">
+                                {{ $p }}
+                            </button>
+                        @endfor
+
+                        @if($endP < $totalPages)
+                            @if($endP < $totalPages - 1)
+                                <span class="px-1 text-gray-400 text-xs">...</span>
+                            @endif
+                            <button wire:click="setPage({{ $totalPages }})" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100">{{ $totalPages }}</button>
+                        @endif
+
+                        <button
+                            wire:click="setPage({{ min($totalPages, $currentPage + 1) }})"
+                            @disabled($currentPage >= $totalPages)
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                            Selanjutnya ›
+                        </button>
+                    </div>
+                    @endif
                 </div>
             </div>
 
@@ -751,8 +805,12 @@
                 <div>
                     <div class="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-1">🧾 Detail Transaksi</div>
                     <div class="font-extrabold text-lg text-gray-900">{{ $selectedTransaction['code'] }}</div>
-                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-3">
-                        <span>👤 {{ $selectedTransaction['cashier'] }}</span>
+                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-3 flex-wrap">
+                        <span>👤 Kasir: <strong class="text-gray-700">{{ $selectedTransaction['cashier'] ?? '-' }}</strong></span>
+                        @if(!empty($selectedTransaction['waiter']) && $selectedTransaction['waiter'] !== '-')
+                        <span>🧑‍🍳 Pelayan: <strong class="text-emerald-700">{{ $selectedTransaction['waiter'] }}</strong></span>
+                        @endif
+                        <span>🛍️ Pembeli: <strong class="text-gray-700">{{ $selectedTransaction['customer'] ?? 'Pelanggan Umum' }}</strong></span>
                         <span>🕐 {{ $selectedTransaction['time'] }}</span>
                         <span class="badge-method {{ $selectedTransaction['method'] === 'QRIS' ? 'badge-method-qris' : 'badge-method-cash' }}">
                             {{ $selectedTransaction['method'] }}

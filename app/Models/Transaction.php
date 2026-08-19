@@ -16,6 +16,8 @@ class Transaction extends Model
     protected $fillable = [
         'store_id',
         'user_id',
+        'waiter_id',
+        'cashier_id',
         'transaction_code',
         'customer_name',
         'subtotal',
@@ -55,6 +57,56 @@ class Transaction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * Get the waiter user.
+     */
+    public function waiter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'waiter_id', 'user_id');
+    }
+
+    /**
+     * Get the cashier user.
+     */
+    public function cashier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_id', 'user_id');
+    }
+
+    /**
+     * Helper accessor to get Waiter Name
+     */
+    public function getWaiterNameAttribute(): string
+    {
+        if ($this->waiter?->name) {
+            return $this->waiter->name;
+        }
+        if ($this->user?->role === 'pelayan') {
+            return $this->user->name;
+        }
+        if (!empty($this->notes) && preg_match('/Order dibuat oleh \[(.*?)\]/i', $this->notes, $m)) {
+            return trim($m[1]);
+        }
+        return '-';
+    }
+
+    /**
+     * Helper accessor to get Cashier Name
+     */
+    public function getCashierNameAttribute(): string
+    {
+        if ($this->cashier?->name) {
+            return $this->cashier->name;
+        }
+        if (in_array($this->user?->role, ['cashier', 'owner', 'admin'], true)) {
+            return $this->user->name;
+        }
+        if (!empty($this->notes) && preg_match('/Dibayar \[(.*?)\]/i', $this->notes, $m)) {
+            return trim($m[1]);
+        }
+        return $this->user?->name ?? '-';
     }
 
     /**
