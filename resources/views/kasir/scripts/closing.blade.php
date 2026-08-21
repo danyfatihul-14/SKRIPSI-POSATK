@@ -32,7 +32,7 @@
             const cashierHeader = document.getElementById('closingCashierNameHeader');
             const storeHeader = document.getElementById('closingStoreNameHeader');
             if (cashierHeader) cashierHeader.innerText = data.cashier_name || 'Kasir';
-            if (storeHeader) storeHeader.innerText = data.store_name || 'Toko Intan';
+            if (storeHeader) storeHeader.innerText = data.store_name || 'Toko Kurnia';
 
             const totalAmountEl = document.getElementById('closingTotalAmount');
             const totalCashEl = document.getElementById('closingTotalCash');

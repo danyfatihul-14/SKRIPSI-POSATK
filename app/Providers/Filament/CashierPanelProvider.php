@@ -22,7 +22,7 @@ class CashierPanelProvider extends PanelProvider
         return $panel
             ->id('cashier')
             ->path('cashier')
-            ->brandName('TOKO INTAN - Kasir')
+            ->brandName('TOKO KURNIA - Kasir')
             ->colors([
                 'primary' => Color::Amber,
             ])

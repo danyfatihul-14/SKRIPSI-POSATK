@@ -11,7 +11,7 @@
 <body class="bg-gray-100">
     <!-- Navbar -->
     <nav class="bg-white shadow px-6 py-4 flex justify-between items-center mb-4">
-        <div class="font-bold text-xl">TOKO INTAN</div>
+        <div class="font-bold text-xl">TOKO KURNIA</div>
         <div>
             <span class="mr-4">Kasir</span>
             <form method="POST" action="{{ route('logout') }}" style="display:inline;">

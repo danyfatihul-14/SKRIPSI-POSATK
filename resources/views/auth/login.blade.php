@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" href="{{ asset('images/4.png') }}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Login - TOKO INTAN</title>
+    <title>Login - TOKO KURNIA</title>
     <style>
         :root {
             --ink: #1f2428;
@@ -268,7 +268,7 @@
     <div class="wrap">
         <div class="card">
             <section class="brand">
-                <span class="badge">TOKO INTAN</span>
+                <span class="badge">TOKO KURNIA</span>
                 <h1>Masuk untuk kelola transaksi dengan cepat</h1>
                 <p>Panel kasir dan admin dipisah otomatis sesuai role akun.</p>
                 <div class="stripe"></div>
@@ -316,23 +316,41 @@
                             </svg>
 
                             {{-- eye-off (awal/tertutup) --}}
-                            <svg id="iconEyeOff" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.943-9.543-7a9.965 9.965 0 012.43-3.95M9.88 9.88A3 3 0 0114.12 14.12M6.1 6.1A9.955 9.955 0 0112 5c4.478 0 8.27 2.943 9.543 7a9.97 9.97 0 01-4.186 5.02M3 3l18 18" />
-                            </svg>
-                        </button>
+                    <div class="field">
+                        <label class="label">Email atau Username</label>
+                        <div class="control">
+                            <input type="text" name="login" value="{{ old('login') }}" class="input" placeholder="Masukkan email atau username" required autofocus>
+                        </div>
+                        @error('login')
+                        <p class="error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="field">
+                        <label class="label">Password</label>
+                        <div class="control">
+                            <input type="password" name="password" class="input" placeholder="Masukkan password" required>
+                        </div>
+                        @error('password')
+                        <p class="error">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="row">
-                        <label>
-                            <input type="checkbox" name="remember" value="1"> Remember me
+                        <label class="remember">
+                            <input type="checkbox" name="remember">
+                            <span>Ingat saya</span>
                         </label>
+
+                        @if (Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" class="forgot">Lupa password?</a>
+                        @endif
                     </div>
 
-                    <button class="btn" type="submit">Login</button>
+                    <button type="submit" class="btn">Masuk ke Sistem</button>
                 </form>
 
-                <div class="foot">TOKO INTAN • Sistem POS</div>
+                <div class="foot">TOKO KURNIA • Sistem POS</div>
             </section>
         </div>
     </div>

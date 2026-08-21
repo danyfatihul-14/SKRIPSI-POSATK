@@ -524,7 +524,7 @@
                     </svg>
                 </div>
                 <div class="brand-text">
-                    <div class="brand-name">TOKO BUKU INTAN</div>
+                    <div class="brand-name">TOKO KURNIA</div>
                     <div class="brand-desc">Point of Sale</div>
                 </div>
             </div>

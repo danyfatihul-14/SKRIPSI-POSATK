@@ -9,7 +9,7 @@
                 Closing Shift: <span id="closingCashierNameHeader">{{ auth()->user()->name }}</span>
             </h2>
             <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
-                Cabang Toko: <strong id="closingStoreNameHeader" style="color: #334155;">{{ auth()->user()->store?->name_store ?? 'Toko Intan' }}</strong>
+                Cabang Toko: <strong id="closingStoreNameHeader" style="color: #334155;">{{ auth()->user()->store?->name_store ?? 'Toko Kurnia' }}</strong>
             </div>
         </div>
 

@@ -1149,7 +1149,7 @@ class KasirController extends Controller
         return response()->json([
             'status' => 'success',
             'cashier_name' => $request->user()->name,
-            'store_name' => $request->user()->store?->name_store ?? 'Toko Intan',
+            'store_name' => $request->user()->store?->name_store ?? 'Toko Kurnia',
             'date' => $date,
             'formatted_date' => \Carbon\Carbon::parse($date)->translatedFormat('d F Y'),
             'total_transactions' => $totalCount,

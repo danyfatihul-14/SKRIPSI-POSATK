@@ -138,7 +138,7 @@
                         <div class="bubble three"><i class="bi bi-briefcase"></i></div>
 
                         <div class="center-card">
-                            <p class="mb-1 fw-semibold text-brand" style="font-size: 0.85rem;">Toko Intan</p>
+                            <p class="mb-1 fw-semibold text-brand" style="font-size: 0.85rem;">Toko Kurnia</p>
                             <h5 class="mb-2 brand-serif" style="font-size: 1.1rem;">Premium Stationery</h5>
                             <small class="muted" style="font-size: 0.8rem; color: #6c757d;">Simple, cepat, dan user friendly</small>
                         </div>

@@ -3,9 +3,9 @@
         <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('public.dashboard') }}">
             <img
                 src="{{ asset('images/logo-intan.png') }}"
-                alt="Logo Toko Intan"
+                alt="Logo Toko Kurnia"
                 style="height:34px; width:auto; border-radius:8px;">
-            <span class="brand-serif fw-bold" style="font-size:1.15rem; color:#4c311f;">Toko Intan</span>
+            <span class="brand-serif fw-bold" style="font-size:1.15rem; color:#4c311f;">Toko Kurnia</span>
         </a>
 
         <button class="navbar-toggler py-1 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
