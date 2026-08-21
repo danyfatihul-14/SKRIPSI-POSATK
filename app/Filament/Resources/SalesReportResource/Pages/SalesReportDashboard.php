@@ -43,9 +43,14 @@ class SalesReportDashboard extends Page
         // Fetch stores
         $this->stores = \App\Models\Store::query()->pluck('name_store', 'store_id')->toArray();
         
-        // Default to user's store_id if set, or null (all stores)
+        // Default to user's branch store_id if set, or fallback to first store
         $userStoreId = auth()->user()?->store_id;
-        $this->storeId = $userStoreId ? (int)$userStoreId : null;
+        if ($userStoreId) {
+            $this->storeId = (int)$userStoreId;
+        } else {
+            $firstStoreId = array_key_first($this->stores);
+            $this->storeId = $firstStoreId ? (int)$firstStoreId : null;
+        }
 
         $this->startDate = now()->startOfMonth()->toDateString();
         $this->endDate = now()->toDateString();

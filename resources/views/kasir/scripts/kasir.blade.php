@@ -989,9 +989,33 @@
         return new File([u8arr], filename, {type:mime});
     }
 
+    var allCategories = [];
+
+    window.filterAddProductCategories = function() {
+        const searchInput = document.getElementById('addProductCategorySearch');
+        const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const select = document.getElementById('addProductCategory');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Pilih Kategori (opsional)...</option>';
+        const filtered = (window.allCategories || []).filter(cat => 
+            !q || (cat.category_name && cat.category_name.toLowerCase().includes(q))
+        );
+
+        filtered.forEach(cat => {
+            select.innerHTML += `<option value="${cat.category_id}">${cat.category_name}</option>`;
+        });
+
+        if (filtered.length === 1) {
+            select.value = filtered[0].category_id;
+        }
+    };
+
     window.openAddProductModal = function() {
         // Reset form
         document.getElementById('addProductForm').reset();
+        const searchInput = document.getElementById('addProductCategorySearch');
+        if (searchInput) searchInput.value = '';
         
         capturedImageDataUrl = null;
         switchImageMode('upload');
@@ -1008,13 +1032,8 @@
         fetch('/kasir/categories')
             .then(r => r.json())
             .then(categories => {
-                const select = document.getElementById('addProductCategory');
-                if (select) {
-                    select.innerHTML = '<option value="">Pilih Kategori (opsional)...</option>';
-                    categories.forEach(cat => {
-                        select.innerHTML += `<option value="${cat.category_id}">${cat.category_name}</option>`;
-                    });
-                }
+                window.allCategories = Array.isArray(categories) ? categories : [];
+                window.filterAddProductCategories();
                 
                 // Show modal
                 const modal = document.getElementById('addProductModal');

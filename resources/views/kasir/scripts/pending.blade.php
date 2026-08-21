@@ -1,6 +1,23 @@
 <script>
     window.pendingTransactionMap = window.pendingTransactionMap || {};
     window.selectedPendingTransaction = window.selectedPendingTransaction || null;
+    var pendingAutoRefreshTimer = window.pendingAutoRefreshTimer || null;
+
+    window.manualRefreshPendingList = function() {
+        const icon = document.getElementById('refreshPendingIcon');
+        if (icon) icon.style.transform = 'rotate(360deg)';
+        renderPendingList();
+        setTimeout(function() {
+            if (icon) icon.style.transform = 'none';
+        }, 500);
+    };
+
+    // Auto Refresh Pending Queue every 10 seconds
+    if (!window.pendingAutoRefreshTimer) {
+        window.pendingAutoRefreshTimer = setInterval(function() {
+            renderPendingList();
+        }, 10000);
+    }
 
     function renderPendingList() {
         const box = document.getElementById('pendingList');

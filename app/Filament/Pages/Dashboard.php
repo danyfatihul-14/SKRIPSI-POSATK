@@ -47,18 +47,28 @@ class Dashboard extends Page
             return;
         }
 
+        $userStoreId = auth()->user()?->store_id;
         $today = Carbon::today();
         $lastWeek = Carbon::today()->subDays(7);
 
-        $todayData = DB::table('transactions')
+        $todayQuery = DB::table('transactions')
             ->where('created_at', '>=', $today)
-            ->whereIn('status', ['paid', 'success', 'completed', 'selesai'])
+            ->whereIn('status', ['paid', 'success', 'completed', 'selesai']);
+
+        $weekQuery = DB::table('transactions')
+            ->whereBetween('created_at', [$lastWeek, Carbon::yesterday()->endOfDay()])
+            ->whereIn('status', ['paid', 'success', 'completed', 'selesai']);
+
+        if ($userStoreId) {
+            $todayQuery->where('store_id', $userStoreId);
+            $weekQuery->where('store_id', $userStoreId);
+        }
+
+        $todayData = $todayQuery
             ->selectRaw('COUNT(*) as trx_count, COALESCE(SUM(total_amount),0) as total_sales')
             ->first();
 
-        $weekData = DB::table('transactions')
-            ->whereBetween('created_at', [$lastWeek, Carbon::yesterday()->endOfDay()])
-            ->whereIn('status', ['paid', 'success', 'completed', 'selesai'])
+        $weekData = $weekQuery
             ->selectRaw('COALESCE(SUM(total_amount),0) as total_sales')
             ->first();
 
@@ -70,16 +80,22 @@ class Dashboard extends Page
         $activeStores = 1;
 
         if (Schema::hasTable('stock_levels')) {
-            $lowStock = DB::table('stock_levels')
+            $stockQuery = DB::table('stock_levels');
+            if ($userStoreId) {
+                $stockQuery->where('store_id', $userStoreId);
+            }
+            $lowStock = $stockQuery
                 ->select('product_id')
                 ->groupBy('product_id')
                 ->havingRaw('SUM(quantity) < 10')
                 ->get()
                 ->count();
 
-            $activeStores = DB::table('stock_levels')
-                ->distinct()
-                ->count('store_id');
+            $storeQuery = DB::table('stock_levels');
+            if ($userStoreId) {
+                $storeQuery->where('store_id', $userStoreId);
+            }
+            $activeStores = $storeQuery->distinct()->count('store_id');
         }
 
         $this->summaryCards = [
@@ -123,16 +139,20 @@ class Dashboard extends Page
             return;
         }
 
+        $userStoreId = auth()->user()?->store_id;
         $status = ['paid', 'success', 'completed', 'selesai'];
 
         if ($range === '24H') {
-            $rows = DB::table('transactions')
+            $query = DB::table('transactions')
                 ->selectRaw('HOUR(created_at) as h, COUNT(*) as trx, COALESCE(SUM(total_amount),0) as sales')
                 ->where('created_at', '>=', now()->startOfDay())
-                ->whereIn('status', $status)
-                ->groupBy('h')
-                ->orderBy('h')
-                ->get();
+                ->whereIn('status', $status);
+
+            if ($userStoreId) {
+                $query->where('store_id', $userStoreId);
+            }
+
+            $rows = $query->groupBy('h')->orderBy('h')->get();
 
             $map = $rows->keyBy('h');
             $labels = [];
@@ -145,14 +165,16 @@ class Dashboard extends Page
                 $trx[] = (int) (($map[$i]->trx ?? 0));
             }
         } elseif ($range === '1Y') {
-            $rows = DB::table('transactions')
+            $query = DB::table('transactions')
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as p, COUNT(*) as trx, COALESCE(SUM(total_amount),0) as sales")
                 ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
-                ->whereIn('status', $status)
-                ->groupBy('p')
-                ->orderBy('p')
-                ->get()
-                ->keyBy('p');
+                ->whereIn('status', $status);
+
+            if ($userStoreId) {
+                $query->where('store_id', $userStoreId);
+            }
+
+            $rows = $query->groupBy('p')->orderBy('p')->get()->keyBy('p');
 
             $labels = [];
             $sales = [];
@@ -168,14 +190,16 @@ class Dashboard extends Page
         } else {
             $days = $range === '1M' ? 30 : 7;
 
-            $rows = DB::table('transactions')
+            $query = DB::table('transactions')
                 ->selectRaw('DATE(created_at) as d, COUNT(*) as trx, COALESCE(SUM(total_amount),0) as sales')
                 ->where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
-                ->whereIn('status', $status)
-                ->groupBy('d')
-                ->orderBy('d')
-                ->get()
-                ->keyBy('d');
+                ->whereIn('status', $status);
+
+            if ($userStoreId) {
+                $query->where('store_id', $userStoreId);
+            }
+
+            $rows = $query->groupBy('d')->orderBy('d')->get()->keyBy('d');
 
             $labels = [];
             $sales = [];
@@ -196,14 +220,18 @@ class Dashboard extends Page
     protected function loadActivities(): void
     {
         $activities = [];
+        $userStoreId = auth()->user()?->store_id;
 
         if (Schema::hasTable('transactions')) {
-            $recentTrx = DB::table('transactions')
+            $trxQuery = DB::table('transactions')
                 ->where('created_at', '>=', Carbon::today())
-                ->whereIn('status', ['paid', 'success', 'completed', 'selesai'])
-                ->orderByDesc('created_at')
-                ->limit(3)
-                ->get();
+                ->whereIn('status', ['paid', 'success', 'completed', 'selesai']);
+
+            if ($userStoreId) {
+                $trxQuery->where('store_id', $userStoreId);
+            }
+
+            $recentTrx = $trxQuery->orderByDesc('created_at')->limit(3)->get();
 
             foreach ($recentTrx as $trx) {
                 $activities[] = [
@@ -218,8 +246,14 @@ class Dashboard extends Page
 
         // FIX: ambil stok kritis dari stock_level, bukan products.stock
         if (Schema::hasTable('stock_levels') && Schema::hasTable('products')) {
-            $lowStocks = DB::table('stock_levels as s')
-                ->join('products as p', 'p.product_id', '=', 's.product_id')
+            $stockQuery = DB::table('stock_levels as s')
+                ->join('products as p', 'p.product_id', '=', 's.product_id');
+
+            if ($userStoreId) {
+                $stockQuery->where('s.store_id', $userStoreId);
+            }
+
+            $lowStocks = $stockQuery
                 ->selectRaw('p.product_name, SUM(s.quantity) as qty_total')
                 ->groupBy('p.product_id', 'p.product_name')
                 ->havingRaw('SUM(s.quantity) < 5')

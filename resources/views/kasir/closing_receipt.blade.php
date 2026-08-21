@@ -64,6 +64,7 @@
     </div>
 
     @forelse($productsSummary as $p)
+    @if(($p['qty'] ?? 0) >= 1)
     <div style="margin-bottom: 4px; font-size: 11px;">
         <div style="font-weight: bold;">{{ $p['name'] }}</div>
         <div class="row">
@@ -71,6 +72,7 @@
             <span>Rp{{ number_format($p['subtotal'], 0, ',', '.') }}</span>
         </div>
     </div>
+    @endif
     @empty
     <div style="text-align: center; color: #666;">Belum ada produk terjual.</div>
     @endforelse

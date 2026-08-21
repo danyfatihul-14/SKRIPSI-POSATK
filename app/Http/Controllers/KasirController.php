@@ -1143,6 +1143,7 @@ class KasirController extends Controller
             }
         }
 
+        $productSummaryMap = array_filter($productSummaryMap, fn($item) => (int)($item['qty'] ?? 0) >= 1);
         usort($productSummaryMap, fn($a, $b) => $b['qty'] <=> $a['qty']);
 
         return response()->json([
@@ -1222,6 +1223,7 @@ class KasirController extends Controller
             }
         }
 
+        $productSummaryMap = array_filter($productSummaryMap, fn($item) => (int)($item['qty'] ?? 0) >= 1);
         usort($productSummaryMap, fn($a, $b) => $b['qty'] <=> $a['qty']);
 
         return view('kasir.closing_receipt', [

@@ -525,8 +525,10 @@
 
             <div>
                 <label style="display:block; font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; text-transform:uppercase; text-align: left;">Kategori</label>
+                <input type="text" id="addProductCategorySearch" placeholder="🔍 Cari / ketik kategori..." oninput="filterAddProductCategories()"
+                    style="width:100%; border:1px solid var(--accent); border-radius:8px 8px 0 0; padding:8px 10px; font-size:13px; outline:none; background:#f8fafc;" />
                 <select id="addProductCategory" 
-                    style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; background:white;">
+                    style="width:100%; border:1px solid var(--accent); border-top:none; border-radius:0 0 8px 8px; padding:8px 10px; font-size:13px; outline:none; background:white;">
                     <option value="">Pilih Kategori (opsional)...</option>
                 </select>
             </div>
@@ -542,11 +544,23 @@
                     <select id="addProductUnit" 
                         style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; background:white; cursor:pointer;">
                         <option value="biji">biji</option>
-                        <option value="lusin">lusin</option>
+                        <option value="pcs">pcs</option>
+                        <option value="buah">buah</option>
+                        <option value="lembar">lembar</option>
+                        <option value="rim">rim</option>
+                        <option value="roll">roll</option>
                         <option value="pack">pack</option>
                         <option value="box">box</option>
-                        <option value="lembar">lembar</option>
-                        <option value="buah">buah</option>
+                        <option value="dus">dus</option>
+                        <option value="lusin">lusin</option>
+                        <option value="kodi">kodi</option>
+                        <option value="gross">gross</option>
+                        <option value="set">set</option>
+                        <option value="pasang">pasang</option>
+                        <option value="botol">botol</option>
+                        <option value="sachet">sachet</option>
+                        <option value="tube">tube</option>
+                        <option value="meter">meter</option>
                     </select>
                 </div>
             </div>

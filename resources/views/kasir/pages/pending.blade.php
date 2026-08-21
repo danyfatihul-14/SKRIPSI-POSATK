@@ -69,11 +69,21 @@
             <div class="pending-head">
                 <div>
                     <div class="pending-title">Waiting Payment</div>
-                    <div class="pending-subtitle">Transaksi dari pelayan yang menunggu pembayaran kasir</div>
+                    <div class="pending-subtitle">Transaksi dari pelayan yang menunggu pembayaran kasir • <span style="color:#059669; font-weight:600;">⚡ Auto-refresh (10d)</span></div>
                 </div>
-                <span class="pending-badge">
-                    Total: <span id="pendingTotalCount">0</span>
-                </span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" onclick="manualRefreshPendingList()" id="btnRefreshPending"
+                        style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                        <svg id="refreshPendingIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 15px; height: 15px; transition: transform 0.3s ease;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span>🔄 Refresh Antrian</span>
+                    </button>
+
+                    <span class="pending-badge">
+                        Total: <span id="pendingTotalCount">0</span>
+                    </span>
+                </div>
             </div>
 
             <div id="pendingList"></div>

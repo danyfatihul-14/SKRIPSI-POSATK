@@ -108,18 +108,18 @@
 
     function saveStockAdjustment() {
         if (!activeAdjustProductId || isSubmittingStockAdjust) return;
-        const typeSelect = document.getElementById('adjustType');
-        const qtyInput = document.getElementById('adjustQty');
-        const notesInput = document.getElementById('adjustNotes');
 
-        const type = typeSelect ? typeSelect.value : 'in';
-        const qty = parseInt(qtyInput ? qtyInput.value : 0, 10);
-        const notes = notesInput ? notesInput.value.trim() : '';
+        const newQtyInput = document.getElementById('adjustModalNewQty');
+        const incomingQty = parseInt(newQtyInput ? newQtyInput.value : 0, 10);
 
-        if (!qty || qty <= 0) {
-            window.showAlert('Jumlah penyesuaian stok harus lebih dari 0.', 'warning');
+        if (isNaN(incomingQty) || incomingQty <= 0) {
+            window.showAlert('Jumlah barang masuk harus lebih dari 0.', 'warning');
             return;
         }
+
+        const currentQtyEl = document.getElementById('adjustModalCurrentQty');
+        const currentQty = parseInt(currentQtyEl ? currentQtyEl.innerText : 0, 10) || 0;
+        const totalQuantity = currentQty + incomingQty;
 
         isSubmittingStockAdjust = true;
         const btnSave = document.querySelector('#stockAdjustModal button[onclick="saveStockAdjustment()"]');
@@ -137,9 +137,7 @@
             },
             body: JSON.stringify({
                 product_id: activeAdjustProductId,
-                type: type,
-                quantity: qty,
-                notes: notes
+                quantity: totalQuantity
             })
         })
         .then(r => r.json())
@@ -148,6 +146,9 @@
                 window.showAlert(res.message || 'Stok berhasil diperbarui.', 'success');
                 closeStockAdjustModal();
                 initStockPage();
+                if (typeof fetchProducts === 'function') {
+                    fetchProducts('');
+                }
             } else {
                 window.showAlert(res.message || 'Gagal memperbarui stok.', 'error');
             }
@@ -160,7 +161,7 @@
             isSubmittingStockAdjust = false;
             if (btnSave) {
                 btnSave.disabled = false;
-                btnSave.innerText = 'Simpan Stok';
+                btnSave.innerText = 'Simpan Barang Masuk';
             }
         });
     }
