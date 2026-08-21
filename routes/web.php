@@ -24,7 +24,9 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::delete('/admin/products/{product}', [ProductController::class, 'destroy'])->name('admin.products.destroy');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/cashier', [KasirController::class, 'index'])->name('cashier');
+    Route::get('/cashier', function () {
+        return view('kasir.dashboard');
+    })->name('cashier');
     Route::get('/kasir', fn() => redirect()->route('cashier'))->name('kasir.index');
     Route::get('/kasir/search', [KasirController::class, 'search'])->name('kasir.search');
     Route::post('/kasir/order', [KasirController::class, 'storeOrder'])->name('kasir.order.store');
@@ -43,8 +45,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/kasir/categories', [KasirController::class, 'getCategories'])->name('kasir.categories');
     Route::post('/kasir/products', [KasirController::class, 'storeProduct'])->name('kasir.products.store');
     Route::post('/kasir/products/{product}/update-image', [KasirController::class, 'updateProductImage'])->name('kasir.products.update-image');
-    Route::get('/cashier', function () {
-        return view('kasir.dashboard');})->name('cashier');
 });
 
 require __DIR__ . '/predictions.php';

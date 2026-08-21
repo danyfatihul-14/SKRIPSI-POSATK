@@ -38,13 +38,15 @@
         printWindow.document.close();
     };
 
-    let cart = [];
-    const currentUserId = "{{ auth()->user()->user_id ?? auth()->user()->id ?? 'guest' }}";
-    const heldCartsKey = 'heldCarts_' + currentUserId;
-    let heldCarts = JSON.parse(localStorage.getItem(heldCartsKey) || '[]');
-    var products = [];
-    let searchTimer = null;
-    let receiptPrintUrl = '';
+    window.cart = window.cart || [];
+    var cart = window.cart;
+    var currentUserId = window.currentUserId || "{{ auth()->user()->user_id ?? auth()->user()->id ?? 'guest' }}";
+    window.currentUserId = currentUserId;
+    var heldCartsKey = 'heldCarts_' + currentUserId;
+    var heldCarts = JSON.parse(localStorage.getItem(heldCartsKey) || '[]');
+    var products = window.products || [];
+    var searchTimer = null;
+    var receiptPrintUrl = '';
 
     function getVariantDisplayName(p) {
         const variantEmpty = !p.variant || p.variant === '-' || p.variant.toLowerCase() === 'default';
@@ -297,7 +299,7 @@
         return prod && !!prod.is_dynamic_price;
     }
 
-    let lastAddCartTime = 0;
+    var lastAddCartTime = 0;
 
     function addCart(id, name, price, btn = null) {
         const now = Date.now();
@@ -661,8 +663,8 @@
     };
 
     // === LOGIC MODAL VARIANT ===
-    let currentVariants = [];
-    let selectedVariantId = null;
+    var currentVariants = window.currentVariants || [];
+    var selectedVariantId = window.selectedVariantId || null;
 
     window.openVariantModal = function(productName) {
         const rawVariants = products.filter(p => p.product_name === productName);
@@ -878,9 +880,9 @@
         if (modal) modal.classList.add('hidden');
     }
 
-    let cameraStream = null;
-    let capturedImageDataUrl = null;
-    let activeImageMode = 'upload';
+    var cameraStream = null;
+    var capturedImageDataUrl = null;
+    var activeImageMode = 'upload';
 
     window.switchImageMode = function(mode) {
         activeImageMode = mode;
@@ -1105,7 +1107,7 @@
         });
     }
 
-    let html5QrcodeScanner = null;
+    var html5QrcodeScanner = null;
 
     function openQrScanModal() {
         const modal = document.getElementById('qrScanModal');
@@ -1166,7 +1168,7 @@
         }
     }
 
-    let selectedQrIds = new Set();
+    var selectedQrIds = window.selectedQrIds || new Set();
 
     window.toggleQrCard = function(card, event) {
         const cb = card.querySelector('.qr-item-checkbox');
@@ -1357,10 +1359,10 @@
         printWindow.document.close();
     };
 
-    let editImageCamStream = null;
-    let capturedBase64Image = null;
-    let currentEditTab = 'file';
-    let currentCameraFacingMode = 'environment';
+    var editImageCamStream = null;
+    var capturedBase64Image = null;
+    var currentEditTab = 'file';
+    var currentCameraFacingMode = 'environment';
 
     window.openEditImageModal = function(productId, productName) {
         const pIdInput = document.getElementById('editImageProductId');

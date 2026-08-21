@@ -1,5 +1,5 @@
 <script>
-    let currentQrisTransactionId = null;
+    var currentQrisTransactionId = null;
 
     function getActivePaymentSource() {
         if (window.selectedPendingTransaction) {
@@ -197,8 +197,8 @@
             label.innerText = source.type === "pending" ? "Bayar Transaksi Pending" : "Proses Transaksi";
         }
     }
-    let qrisPaid = false;
-    let isGeneratingQris = false;
+    var qrisPaid = false;
+    var isGeneratingQris = false;
 
     function safeParseJson(raw) {
         try {
@@ -304,7 +304,7 @@
         });
     }
 
-    let snapResizeObserver = null;
+    var snapResizeObserver = null;
 
     function removeSnapEmbedOverlay() {
         const overlay = document.getElementById('snap-embed-overlay');
@@ -550,7 +550,7 @@
         updateChange();
     });
 
-    let isSubmittingPayment = false;
+    var isSubmittingPayment = false;
 
     document.getElementById("paymentForm")?.addEventListener("submit", function(e) {
         if (isSubmittingPayment) {

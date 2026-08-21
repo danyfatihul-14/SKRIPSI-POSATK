@@ -28,7 +28,7 @@ class KasirController extends Controller
 
     public function index()
     {
-        return view('kasir.index');
+        return view('kasir.dashboard');
     }
 
     public function search(Request $request)
@@ -1095,23 +1095,19 @@ class KasirController extends Controller
 
     public function closingReport(Request $request)
     {
-        abort_unless(in_array($request->user()?->role, ['cashier', 'admin', 'owner'], true), 403);
+        abort_unless(in_array(strtolower((string) $request->user()?->role), ['cashier', 'kasir', 'admin', 'owner', 'pelayan', 'waiter'], true), 403);
 
         $date = $request->input('date', date('Y-m-d'));
-        $storeId = $request->user()->store_id;
-        $userId = $request->user()->user_id;
+        $storeId = $request->user()?->store_id;
+        if (!$storeId) {
+            $storeId = \App\Models\Store::query()->value('store_id');
+        }
 
         $query = Transaction::query()
-            ->with(['items.product:product_id,product_name,variant', 'waiter:user_id,name'])
+            ->with(['items.product:product_id,product_name,variant', 'waiter:user_id,name', 'cashier:user_id,name'])
             ->where('store_id', $storeId)
             ->where('status', 'completed')
-            ->whereDate('created_at', $date)
-            ->where(function ($q) use ($userId) {
-                $q->where('cashier_id', $userId)
-                  ->orWhere(function ($q2) use ($userId) {
-                      $q2->whereNull('cashier_id')->where('user_id', $userId);
-                  });
-            });
+            ->whereDate('created_at', $date);
 
         $transactions = $query->orderBy('created_at', 'desc')->get();
 
@@ -1167,6 +1163,7 @@ class KasirController extends Controller
                 'created_at' => $t->created_at?->format('H:i:s'),
                 'payment_method' => strtoupper($t->payment_method ?? 'CASH'),
                 'customer_name' => $t->customer_name ?? 'Pelanggan Umum',
+                'cashier_name' => $t->cashier_name,
                 'waiter_name' => $t->waiter_name,
                 'total_amount' => (float) $t->total_amount,
                 'cash_paid' => (float) ($t->cash_paid ?? $t->total_amount),
@@ -1177,23 +1174,19 @@ class KasirController extends Controller
 
     public function closingReceipt(Request $request)
     {
-        abort_unless(in_array($request->user()?->role, ['cashier', 'admin', 'owner'], true), 403);
+        abort_unless(in_array(strtolower((string) $request->user()?->role), ['cashier', 'kasir', 'admin', 'owner', 'pelayan', 'waiter'], true), 403);
 
         $date = $request->input('date', date('Y-m-d'));
-        $storeId = $request->user()->store_id;
-        $userId = $request->user()->user_id;
+        $storeId = $request->user()?->store_id;
+        if (!$storeId) {
+            $storeId = \App\Models\Store::query()->value('store_id');
+        }
 
         $query = Transaction::query()
-            ->with(['items.product:product_id,product_name,variant', 'waiter:user_id,name'])
+            ->with(['items.product:product_id,product_name,variant', 'waiter:user_id,name', 'cashier:user_id,name'])
             ->where('store_id', $storeId)
             ->where('status', 'completed')
-            ->whereDate('created_at', $date)
-            ->where(function ($q) use ($userId) {
-                $q->where('cashier_id', $userId)
-                  ->orWhere(function ($q2) use ($userId) {
-                      $q2->whereNull('cashier_id')->where('user_id', $userId);
-                  });
-            });
+            ->whereDate('created_at', $date);
 
         $transactions = $query->orderBy('created_at', 'asc')->get();
 
@@ -1206,6 +1199,31 @@ class KasirController extends Controller
         $totalCash = (float) $cashTransactions->sum('total_amount');
         $totalQris = (float) $qrisTransactions->sum('total_amount');
 
+        // Summarize items sold (Products Keluar) for restocking / kulakan
+        $productSummaryMap = [];
+        $totalQtySold = 0;
+
+        foreach ($transactions as $t) {
+            foreach ($t->items as $item) {
+                $pName = $item->product?->product_name ?? 'Produk';
+                $vName = trim($item->product?->variant ?? '');
+                $key = $pName . ($vName !== '' && $vName !== '-' ? " ({$vName})" : '');
+                
+                if (!isset($productSummaryMap[$key])) {
+                    $productSummaryMap[$key] = [
+                        'name' => $key,
+                        'qty' => 0,
+                        'subtotal' => 0.0,
+                    ];
+                }
+                $productSummaryMap[$key]['qty'] += (int) $item->quantity;
+                $productSummaryMap[$key]['subtotal'] += (float) $item->subtotal;
+                $totalQtySold += (int) $item->quantity;
+            }
+        }
+
+        usort($productSummaryMap, fn($a, $b) => $b['qty'] <=> $a['qty']);
+
         return view('kasir.closing_receipt', [
             'cashier' => $request->user(),
             'store' => $request->user()->store,
@@ -1215,6 +1233,8 @@ class KasirController extends Controller
             'totalAmount' => $totalAmount,
             'totalCash' => $totalCash,
             'totalQris' => $totalQris,
+            'totalQtySold' => $totalQtySold,
+            'productsSummary' => array_values($productSummaryMap),
             'transactions' => $transactions,
         ]);
     }

@@ -1,7 +1,7 @@
 {{-- filepath: e:\Polinema\Semester8\Skripsi\pos\resources\views\kasir\scripts\stok.blade.php --}}
 <script>
-    let stockProducts = [];
-    let activeAdjustProductId = null;
+    var stockProducts = window.stockProducts || [];
+    var activeAdjustProductId = window.activeAdjustProductId || null;
 
     function initStockPage() {
         // Fetch all products in the store to get up-to-date stock information
@@ -104,57 +104,64 @@
         activeAdjustProductId = null;
     }
 
-    let isSubmittingStockAdjust = false;
+    var isSubmittingStockAdjust = false;
 
     function saveStockAdjustment() {
         if (!activeAdjustProductId || isSubmittingStockAdjust) return;
+        const typeSelect = document.getElementById('adjustType');
+        const qtyInput = document.getElementById('adjustQty');
+        const notesInput = document.getElementById('adjustNotes');
 
-        const newQtyInput = document.getElementById('adjustModalNewQty');
-        const incomingQty = parseInt(newQtyInput.value);
+        const type = typeSelect ? typeSelect.value : 'in';
+        const qty = parseInt(qtyInput ? qtyInput.value : 0, 10);
+        const notes = notesInput ? notesInput.value.trim() : '';
 
-        if (isNaN(incomingQty) || incomingQty < 0) {
-            window.showAlert('Jumlah barang masuk harus berupa angka positif!', 'warning');
+        if (!qty || qty <= 0) {
+            window.showAlert('Jumlah penyesuaian stok harus lebih dari 0.', 'warning');
             return;
         }
 
         isSubmittingStockAdjust = true;
+        const btnSave = document.querySelector('#stockAdjustModal button[onclick="saveStockAdjustment()"]');
+        if (btnSave) {
+            btnSave.disabled = true;
+            btnSave.innerText = '⏳ Menyimpan...';
+        }
 
-        const currentQty = parseInt(document.getElementById('adjustModalCurrentQty').innerText) || 0;
-        const quantity = currentQty + incomingQty;
-
-        const params = new URLSearchParams();
-        params.append('product_id', activeAdjustProductId);
-        params.append('quantity', quantity);
-
-        fetch('{{ route("kasir.stok.adjust") }}', {
+        fetch('/kasir/stok/adjust', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json'
             },
-            body: params
+            body: JSON.stringify({
+                product_id: activeAdjustProductId,
+                type: type,
+                quantity: qty,
+                notes: notes
+            })
         })
         .then(r => r.json())
         .then(res => {
             if (res.status === 'success') {
+                window.showAlert(res.message || 'Stok berhasil diperbarui.', 'success');
                 closeStockAdjustModal();
-                window.showAlert(res.message, 'success');
-                // Refresh data
                 initStockPage();
-                // Also trigger reload of cashier products if the function exists
-                if (typeof fetchProducts === 'function') {
-                    fetchProducts('');
-                }
             } else {
-                window.showAlert(res.message || 'Gagal menyimpan perubahan.', 'error');
+                window.showAlert(res.message || 'Gagal memperbarui stok.', 'error');
             }
         })
-        .catch(e => {
-            console.error(e);
-            window.showAlert('Terjadi kesalahan jaringan saat menyimpan stok.', 'error');
+        .catch(err => {
+            console.error('Error stock adjust:', err);
+            window.showAlert('Terjadi kesalahan jaringan.', 'error');
         })
         .finally(() => {
             isSubmittingStockAdjust = false;
+            if (btnSave) {
+                btnSave.disabled = false;
+                btnSave.innerText = 'Simpan Stok';
+            }
         });
     }
 
@@ -226,7 +233,7 @@
         previewBox.style.display = 'flex';
     }
 
-    let isSubmittingStockConvert = false;
+    var isSubmittingStockConvert = false;
 
     function handleStockConvert(e) {
         e.preventDefault();

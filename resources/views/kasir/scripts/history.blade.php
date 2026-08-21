@@ -1,7 +1,7 @@
 <script>
     const historyIsWaiter = document.querySelector('.main-container')?.dataset.isWaiter === '1';
-    let allTransactions = [];
-    let filteredTransactions = [];
+    var allTransactions = window.allTransactions || [];
+    var filteredTransactions = window.filteredTransactions || [];
 
     async function loadTransactionHistory() {
         const historyList = document.getElementById('historyList');
