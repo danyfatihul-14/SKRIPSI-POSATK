@@ -236,22 +236,27 @@ class KasirController extends Controller
                 ];
             }
 
-            $qrisFee = (int) round($calcSubtotal * 0.007);
-            $grossAmount = $calcSubtotal + $qrisFee;
+            $discountAmount = $this->calculateDiscountAmount(
+                (float) $calcSubtotal,
+                (string) $request->input('discount_type', 'rp'),
+                (float) $request->input('discount_value', 0)
+            );
+
+            if ($discountAmount > 0) {
+                $itemDetails[] = [
+                    'id'       => 'DISCOUNT',
+                    'price'    => -$discountAmount,
+                    'quantity' => 1,
+                    'name'     => 'Potongan Diskon',
+                ];
+            }
+
+            $grossAmount = $calcSubtotal - $discountAmount;
 
             if ($grossAmount < 1000) {
                 throw ValidationException::withMessages([
                     'total_amount' => 'Minimal pembayaran QRIS Rp 1.000.',
                 ]);
-            }
-
-            if ($qrisFee > 0) {
-                $itemDetails[] = [
-                    'id'       => 'FEE-QRIS',
-                    'price'    => $qrisFee,
-                    'quantity' => 1,
-                    'name'     => 'Biaya Layanan QRIS 0.7%',
-                ];
             }
 
             $transactionId = $request->input('transaction_id') ?? time();
@@ -420,6 +425,26 @@ class KasirController extends Controller
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * Hitung nominal potongan (Rupiah bulat) dengan aturan yang sama seperti checkout:
+     * persen dibulatkan ke atas per Rp500, nominal Rp dibatasi maksimal subtotal.
+     */
+    private function calculateDiscountAmount(float $grossSubtotal, string $discountType, float $discountVal): int
+    {
+        if ($grossSubtotal <= 0 || $discountVal <= 0) {
+            return 0;
+        }
+
+        if ($discountType === 'percent') {
+            $rawAfter = $grossSubtotal * (1 - (min(100, max(0, $discountVal)) / 100));
+            $totalAmount = min($grossSubtotal, ceil($rawAfter / 500) * 500);
+
+            return (int) round(max(0, $grossSubtotal - $totalAmount));
+        }
+
+        return (int) round(min($grossSubtotal, max(0, $discountVal)));
     }
 
     private function buildCartItems(array $rawCart, ?int $storeId = null, bool $skipStockCheck = false): array

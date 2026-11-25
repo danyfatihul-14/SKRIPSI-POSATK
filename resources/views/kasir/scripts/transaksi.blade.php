@@ -149,7 +149,14 @@
     function updateChange() {
         const method = (document.getElementById("paymentMethod") || {}).value || "cash";
         const total = Number(getBreakdown(getActivePaymentSource()).total || 0);
-        const bayar = parseInt((document.getElementById("payment") || {}).value || 0, 10);
+        const paymentInputEl = document.getElementById("payment");
+        // QRIS selalu dibayar pas sesuai Total Belanja (setelah diskon)
+        if (method === "qris" && paymentInputEl) {
+            paymentInputEl.value = total;
+            const qrisAmountEl = document.getElementById("qrisAmount");
+            if (qrisAmountEl) qrisAmountEl.innerText = formatRupiah(total);
+        }
+        const bayar = parseInt((paymentInputEl || {}).value || 0, 10);
         const kembali = bayar - total;
         const changeEl = document.getElementById("change");
         const warningEl = document.getElementById("paymentWarning");
@@ -212,8 +219,8 @@
         }
 
         const tax = 0;
-        const qrisFee = method === "qris" ? getQrisFee(discountedSubtotal) : 0;
-        const total = discountedSubtotal + tax + qrisFee;
+        const qrisFee = 0;
+        const total = discountedSubtotal + tax;
 
         return {
             subtotal: grossSubtotal,
@@ -732,7 +739,9 @@
                 body: JSON.stringify({
                     cart: getActiveCartPayload(),
                     total_amount: total,
-                    transaction_id: currentQrisTransactionId
+                    transaction_id: currentQrisTransactionId,
+                    discount_type: (document.getElementById("checkoutDiscountType") || {}).value || "rp",
+                    discount_value: (document.getElementById("checkoutDiscountValue") || {}).value || 0
                 })
             });
 
@@ -781,16 +790,8 @@
         if (window.showAlert) return window.showAlert(message, type);
     }
 
-    function getQrisFee(subtotal) {
-        return Math.ceil(Number(subtotal || 0) * 0.007);
-    }
-
     function getPayableTotal(source, method) {
-        const subtotal = Number(source.total || 0);
-        if (method === "qris") {
-            return subtotal + getQrisFee(subtotal);
-        }
-        return subtotal;
+        return Number(getBreakdown(source).total || 0);
     }
 
 

@@ -259,10 +259,6 @@
                         <span>Pajak</span>
                         <span id="breakdownTax">Rp0</span>
                     </div>
-                    <div class="trx-breakdown-row"> 
-                        <span>Biaya QRIS (0.7%)</span> 
-                        <span id="breakdownQrisFee">Rp0</span>
-                    </div>
                 </div>
 
                 <div class="trx-total-row">
