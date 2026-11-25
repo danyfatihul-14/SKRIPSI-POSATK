@@ -208,11 +208,12 @@
         @endif
 
         {{-- Filters & Search --}}
-        <div class="flex gap-2 items-center flex-wrap">
-            <x-filament::input.wrapper class="w-44">
+        <div class="flex gap-2 items-center flex-wrap relative">
+            <x-filament::input.wrapper class="w-52">
                 <x-filament::input.select wire:model.live="storeId" class="text-xs">
+                    <option value="">Semua Toko Cabang</option>
                     @foreach($stores as $id => $name)
-                        <option value="{{ $id }}">{{ $name }}</option>
+                        <option value="{{ $id }}" wire:key="store-opt-{{ $id }}">{{ $name }}</option>
                     @endforeach
                 </x-filament::input.select>
             </x-filament::input.wrapper>
@@ -230,26 +231,62 @@
             <x-filament::input.wrapper class="flex-1 min-w-[180px]">
                 <x-filament::input
                     type="text"
-                    wire:model.live="search"
-                    placeholder="Cari produk..."
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Cari nama produk / varian..."
                     class="text-xs" />
             </x-filament::input.wrapper>
 
-            <x-filament::button
-                wire:click="loadProducts"
-                color="primary"
-                size="sm">
-                Refresh
-            </x-filament::button>
+            <div wire:loading wire:target="storeId, missingFilter, search" class="text-xs text-blue-600 font-semibold animate-pulse flex items-center gap-1">
+                <svg class="animate-spin h-3.5 w-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Memuat data...
+            </div>
+        </div>
+
+        {{-- Bulk Selection Bar --}}
+        <div style="display: flex; align-items: center; justify-content: space-between; background: {{ count($selectedProductIds) > 0 ? '#fef2f2' : '#f8fafc' }}; border: 1px solid {{ count($selectedProductIds) > 0 ? '#fecaca' : '#e2e8f0' }}; border-radius: 8px; padding: 10px 14px; margin: 12px 0; font-size: 13px; shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #334155; cursor: pointer;">
+                <input type="checkbox" wire:model.live="selectAllOnPage" style="width: 18px; height: 18px; cursor: pointer; accent-color: #2563eb;">
+                <span>Pilih Semua di Halaman Ini</span>
+            </label>
+
+            @if(count($selectedProductIds) > 0)
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <span style="font-weight: 700; color: #dc2626; font-size: 13px;">
+                    {{ count($selectedProductIds) }} produk dipilih
+                </span>
+                <button
+                    type="button"
+                    wire:click="deleteSelectedProducts"
+                    wire:confirm="Yakin hapus {{ count($selectedProductIds) }} produk yang dipilih secara bersamaan?"
+                    style="background-color: #dc2626 !important; color: #ffffff !important; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 13px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(220, 38, 38, 0.4);">
+                    <svg style="width: 16px; height: 16px; fill: none; stroke: #ffffff; stroke-width: 2.5;" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Hapus {{ count($selectedProductIds) }} Produk Terpilih
+                </button>
+            </div>
+            @endif
         </div>
 
         {{-- Products Grid --}}
-        @if(count($products) > 0)
-        <div class="product-grid">
+        @if($products->count() > 0)
+        <div class="product-grid" wire:loading.class="opacity-60 pointer-events-none" wire:target="storeId, missingFilter, search">
             @foreach($products as $product)
-            <div class="product-card">
+            <div class="product-card" wire:key="product-card-{{ $product->product_id }}" style="position: relative;">
+                {{-- Select Checkbox --}}
+                <div style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+                    <input
+                        type="checkbox"
+                        wire:model.live="selectedProductIds"
+                        value="{{ $product->product_id }}"
+                        class="rounded border-slate-300 text-red-600 focus:ring-red-500 h-4 w-4 shadow-sm cursor-pointer">
+                </div>
+
                 {{-- Edit Icon--}}
-                <a href="{{ route('filament.admin.resources.products.edit', ['record' => $product['product_id'], 'store_id' => $storeId]) }}" class="edit-icon">
+                <a href="{{ route('filament.admin.resources.products.edit', ['record' => $product->product_id, 'store_id' => $storeId]) }}" class="edit-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
@@ -257,10 +294,10 @@
 
                 {{-- Image Container (Golden Aspect Ratio Hack) --}}
                 <div style="position: relative; width: 100%; padding-top: 100%; background: #f1f5f9; border-radius: 8px; overflow: hidden; margin-bottom: 8px; border: 1px solid #f1f5f9;">
-                    @if($product['file_url'])
+                    @if($product->file_url)
                     <img
-                        src="{{ asset('storage/' . $product['file_url']) }}"
-                        alt="{{ $product['product_name'] }}"
+                        src="{{ asset('storage/' . $product->file_url) }}"
+                        alt="{{ $product->product_name }}"
                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"
                         onerror="this.src='https://placehold.co/200x200?text=No+Image'">
                     @else
@@ -271,60 +308,60 @@
                 </div>
 
                 {{-- Incomplete Warning Badges --}}
-                @if(!empty($product['missing']))
+                @if(!empty($product->missing_tags))
                 <div style="display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px;">
-                    @foreach($product['missing'] as $tag)
+                    @foreach($product->missing_tags as $tag)
                         <span class="warning-badge">⚠️ {{ $tag }}</span>
                     @endforeach
                 </div>
                 @endif
 
                 {{-- Info --}}
-                <h3 class="product-title">{{ $product['product_name'] }}</h3>
+                <h3 class="product-title">{{ $product->product_name }}</h3>
 
                 <p class="product-category" style="color:#2563eb; font-weight:700; margin-bottom:2px; font-size:10px;">
-                    Varian: {{ $product['variant'] ?? '-' }}
+                    Varian: {{ $product->variant ?: '-' }}
                 </p>
 
                 <p class="product-category" style="color:#4b5563; font-weight:700; margin-bottom:2px; font-size:10px;">
-                    Satuan: {{ $product['unit'] ?? '-' }}
+                    Satuan: {{ $product->unit ?? '-' }}
                 </p>
 
-                <p class="product-category" style="font-size:10px; color: {{ empty($product['category_id']) ? '#dc2626; font-weight:700;' : '#64748b;' }}">
-                    Kategori: {{ $product['category_name'] ?? 'Belum ada' }}
+                <p class="product-category" style="font-size:10px; color: {{ empty($product->category_id) ? '#dc2626; font-weight:700;' : '#64748b;' }}">
+                    Kategori: {{ $product->category?->category_name ?? 'Belum ada' }}
                 </p>
 
                 <div class="product-info">
                     <div class="product-info-row">
                         <span class="product-label">Hrg Beli:</span>
-                        @if(!empty($product['is_dynamic']))
+                        @if(!empty($product->is_dynamic))
                             <span class="product-value" style="color: #2563eb; font-weight: 700;">Dinamis</span>
                         @else
-                            <span class="product-value" style="{{ $product['purchase_price'] <= 0 ? 'color: #dc2626; font-weight: 700;' : '' }}">
-                                {{ $product['purchase_price'] > 0 ? 'Rp ' . number_format($product['purchase_price'], 0, ',', '.') : 'Belum diisi' }}
+                            <span class="product-value" style="{{ ($product->purchase_price ?? 0) <= 0 ? 'color: #dc2626; font-weight: 700;' : '' }}">
+                                {{ ($product->purchase_price ?? 0) > 0 ? 'Rp ' . number_format($product->purchase_price, 0, ',', '.') : 'Belum diisi' }}
                             </span>
                         @endif
                     </div>
 
                     <div class="product-info-row">
                         <span class="product-label">Hrg Jual:</span>
-                        <span class="product-value">Rp {{ number_format($product['selling_price'], 0, ',', '.') }}</span>
+                        <span class="product-value">Rp {{ number_format($product->selling_price ?? 0, 0, ',', '.') }}</span>
                     </div>
 
                     <div class="product-info-row">
                         <span class="product-label">Stok:</span>
-                        <span class="{{ $product['stock'] > 0 ? 'product-stock-ok' : 'product-stock-out' }}">
-                            {{ $product['stock'] }}
+                        <span class="{{ ($product->formatted_stock ?? 0) > 0 ? 'product-stock-ok' : 'product-stock-out' }}">
+                            {{ $product->formatted_stock ?? 0 }}
                         </span>
                     </div>
                 </div>
 
                 <div class="product-actions">
-                    <a href="{{ route('filament.admin.resources.products.edit', ['record' => $product['product_id'], 'store_id' => $storeId]) }}" class="btn-edit">
+                    <a href="{{ route('filament.admin.resources.products.edit', ['record' => $product->product_id, 'store_id' => $storeId]) }}" class="btn-edit">
                         Edit
                     </a>
                     <button
-                        wire:click="deleteProduct({{ $product['product_id'] }})"
+                        wire:click="deleteProduct({{ $product->product_id }})"
                         wire:confirm="Yakin hapus produk ini?"
                         class="btn-delete">
                         Hapus
@@ -332,6 +369,10 @@
                 </div>
             </div>
             @endforeach
+        </div>
+
+        <div class="mt-4">
+            {{ $products->links() }}
         </div>
         @else
         <div style="text-align: center; padding: 32px 0;">

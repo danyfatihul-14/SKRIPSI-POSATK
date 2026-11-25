@@ -12,11 +12,11 @@
         }, 500);
     };
 
-    // Auto Refresh Pending Queue every 10 seconds
+    // Auto Refresh Pending Queue every 3.5 seconds
     if (!window.pendingAutoRefreshTimer) {
         window.pendingAutoRefreshTimer = setInterval(function() {
             renderPendingList();
-        }, 10000);
+        }, 3500);
     }
 
     function renderPendingList() {
@@ -101,10 +101,19 @@
 
         window.selectedPendingTransaction = trx;
         
-        // Populate customer name dari pending transaction
+        // Populate customer name & discount from pending transaction
         const customerNameInput = document.getElementById('customerName');
         if (customerNameInput) {
             customerNameInput.value = trx.customer_name || 'Pelanggan Umum';
+        }
+        
+        const discountValInput = document.getElementById('checkoutDiscountValue');
+        const discountTypeInput = document.getElementById('checkoutDiscountType');
+        if (discountValInput) {
+            discountValInput.value = trx.discount || 0;
+        }
+        if (discountTypeInput) {
+            discountTypeInput.value = 'rp';
         }
         
         showPage('transaksi');
@@ -131,7 +140,7 @@
                         renderPendingList();
                         if (typeof fetchProducts === 'function') {
                             const searchInput = document.getElementById('productSearch');
-                            fetchProducts(searchInput ? searchInput.value : '');
+                            fetchProducts(searchInput ? searchInput.value : '', true);
                         }
                     })
                     .catch((e) => window.showAlert(e.message, 'error'));

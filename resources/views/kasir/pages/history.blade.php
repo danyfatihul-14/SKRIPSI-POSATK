@@ -47,6 +47,55 @@
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     }
 
+    #page-history .history-date-filter {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    #page-history .history-date-filter label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        white-space: nowrap;
+    }
+
+    #page-history .history-date-filter input[type="date"] {
+        padding: 7px 10px;
+        border: 1px solid #d5d9e2;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #111827;
+        background: #fff;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    #page-history .history-date-filter input[type="date"]:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    #page-history .history-date-filter .btn-reset-date {
+        padding: 7px 14px;
+        border-radius: 8px;
+        border: 1px solid #d5d9e2;
+        background: #f9fafb;
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    #page-history .history-date-filter .btn-reset-date:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+        color: #374151;
+    }
+
     #page-history .history-content {
         flex: 1;
         overflow-y: auto;
@@ -212,11 +261,21 @@
     @media (max-width: 768px) {
         #page-history .history-header {
             flex-direction: column;
+            align-items: stretch;
             gap: 12px;
         }
 
         #page-history .history-search {
             max-width: 100%;
+        }
+
+        #page-history .history-date-filter {
+            flex-wrap: wrap;
+        }
+
+        #page-history .history-date-filter input[type="date"] {
+            flex: 1;
+            min-width: 120px;
         }
 
         #page-history .history-item-actions {
@@ -238,8 +297,17 @@
                 type="text" 
                 id="historySearchInput" 
                 placeholder="Cari ID transaksi atau customer..."
-                onkeyup="searchHistory(this.value)"
+                onkeyup="applyHistoryFilter()"
             >
+        </div>
+        <div class="history-date-filter">
+            <label for="historyDateFilter">Tanggal:</label>
+            <input 
+                type="date" 
+                id="historyDateFilter" 
+                onchange="applyHistoryFilter()"
+            >
+            <button class="btn-reset-date" onclick="resetHistoryDateFilter()" title="Reset filter tanggal">&#x21BA; Reset</button>
         </div>
     </div>
 

@@ -14,10 +14,10 @@ use Illuminate\Support\Facades\Log;
 
 class XgboostPrediction extends Page
 {
-    protected static ?string $navigationGroup = 'Machine Learning';
+    protected static ?string $navigationGroup = null;
     protected static ?string $navigationLabel = 'XGBoost Prediksi';
     protected static ?string $navigationIcon = 'heroicon-o-cpu-chip';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 5;
     protected static string $view = 'filament.pages.xgboost-prediction';
 
     public ?int $storeId = null;

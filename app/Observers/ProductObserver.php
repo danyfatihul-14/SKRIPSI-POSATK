@@ -9,22 +9,18 @@ class ProductObserver
 {
     /**
      * Handle the Product "created" event.
+     *
+     * CATATAN: StockLevel sengaja TIDAK dibuat otomatis untuk semua cabang.
+     * Setiap cabang hanya memiliki produk jika secara eksplisit mendaftarkannya
+     * (melalui menu kasir "Tambah Produk" atau Admin Filament).
+     * Ini memastikan produk dari Toko A tidak bocor/muncul di Toko B dengan stok 0.
      */
     public function created(Product $product): void
     {
-        // Ambil semua store yang aktif
-        $stores = Store::all();
-
-        foreach ($stores as $store) {
-            // Inisialisasi stok 0 untuk setiap cabang
-            StockLevel::firstOrCreate([
-                'store_id' => $store->store_id,
-                'product_id' => $product->product_id,
-            ], [
-                'quantity' => 0,
-                'unit_price' => $product->selling_price,
-                'discount' => 0,
-            ]);
-        }
+        // Tidak ada auto-create StockLevel untuk semua toko.
+        // StockLevel hanya dibuat oleh:
+        // - KasirController::storeProduct (kasir/pelayan menambahkan produk baru)
+        // - CreateProduct (admin menambahkan produk via Filament)
+        // - StockLevel::updateOrCreate saat admin memilih cabang tertentu
     }
 }

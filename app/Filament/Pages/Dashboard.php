@@ -77,7 +77,7 @@ class Dashboard extends Page
         $salesChange = $weekSales > 0 ? (($todaySales - $weekSales) / $weekSales * 100) : 0;
 
         $lowStock = 0;
-        $activeStores = 1;
+        $activeStores = 0;
 
         if (Schema::hasTable('stock_levels')) {
             $stockQuery = DB::table('stock_levels');
@@ -90,12 +90,14 @@ class Dashboard extends Page
                 ->havingRaw('SUM(quantity) < 10')
                 ->get()
                 ->count();
+        }
 
-            $storeQuery = DB::table('stock_levels');
+        if (Schema::hasTable('stores')) {
+            $storeQuery = DB::table('stores')->where('is_active', 1);
             if ($userStoreId) {
                 $storeQuery->where('store_id', $userStoreId);
             }
-            $activeStores = $storeQuery->distinct()->count('store_id');
+            $activeStores = $storeQuery->count();
         }
 
         $this->summaryCards = [

@@ -56,16 +56,22 @@ class CreateProduct extends CreateRecord
                 ]);
 
                 if ($storeId) {
+                    $stockData = [
+                        'quantity'   => max(0, (int) ($variant['initial_stock'] ?? 0)),
+                        'unit_price' => (float) ($variant['selling_price'] ?? 0),
+                        'discount'   => max(0, (float) ($variant['initial_discount'] ?? 0)),
+                    ];
+
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('stock_levels', 'purchase_price')) {
+                        $stockData['purchase_price'] = (float) ($variant['purchase_price'] ?? 0);
+                    }
+
                     StockLevel::updateOrCreate(
                         [
                             'store_id'   => (int) $storeId,
                             'product_id' => $product->product_id,
                         ],
-                        [
-                            'quantity'   => max(0, (int) ($variant['initial_stock'] ?? 0)),
-                            'unit_price' => (float) ($variant['selling_price'] ?? 0),
-                            'discount'   => max(0, (float) ($variant['initial_discount'] ?? 0)),
-                        ]
+                        $stockData
                     );
                 }
 

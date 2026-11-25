@@ -538,7 +538,7 @@
                 <div class="profile-avatar">{{ strtoupper(substr(auth()->user()->name ?? 'K', 0, 1)) }}</div>
                 <div class="profile-info">
                     <div class="profile-name">{{ auth()->user()->name ?? 'Kasir' }}</div>
-                    <div class="profile-role">{{ $isWaiter ? 'Pelayan' : 'Kasir' }}</div>
+                    <div class="profile-role">{{ auth()->user()?->store?->name_store ? auth()->user()->store->name_store . ' • ' . ucfirst(auth()->user()->role) : ucfirst(auth()->user()?->role ?? 'Kasir') }}</div>
                 </div>
                 <svg style="width:16px; height:16px; color:#FFFFFF; flex-shrink:0; margin-left:4px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -619,6 +619,8 @@
                         <span class="nav-desc">Cetak QR Masal</span>
                     </div>
                 </button>
+
+
                 @else
                 {{-- Kasir --}}
                 <button onclick="showPage('kasir')" id="nav-kasir" class="nav-link active">
@@ -700,6 +702,8 @@
                         <span class="nav-desc">Cetak QR Masal</span>
                     </div>
                 </button>
+
+
 
                 <button onclick="showPage('closing')" id="nav-closing" class="nav-link">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:18px; height:18px;">

@@ -11,9 +11,9 @@ class StockReportResource extends Resource
 {
     protected static ?string $model = StockLog::class;
 
-    protected static ?string $navigationGroup = 'Laporan';
+    protected static ?string $navigationGroup = null;
     protected static ?string $navigationLabel = 'Laporan Stok';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 8;
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     public static function form(\Filament\Forms\Form $form): \Filament\Forms\Form

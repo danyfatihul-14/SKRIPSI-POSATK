@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 use Midtrans\Config;
 use Midtrans\Snap;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class KasirController extends Controller
@@ -35,6 +36,10 @@ class KasirController extends Controller
     {
         $q = trim($request->get('q', ''));
         $storeId = $request->user()?->store_id;
+
+        if (! $storeId) {
+            $storeId = \App\Models\Store::query()->value('store_id');
+        }
 
         $query = Product::query()->with([
             'stockLevels' => fn($subQuery) => $storeId ? $subQuery->where('store_id', $storeId) : $subQuery,
@@ -93,7 +98,7 @@ class KasirController extends Controller
                 'category_name' => $product->category?->category_name ?? '',
                 'variant'       => $product->variant ?? '-',
                 'unit'          => $product->unit ?? '-',
-                'selling_price' => $product->selling_price ?? 0,
+                'selling_price' => ($stockLevel?->unit_price && $stockLevel->unit_price > 0) ? (float) $stockLevel->unit_price : (float) ($product->selling_price ?? 0),
                 'stock'         => (int) ($stockLevel?->quantity ?? 0),
                 'image_url'     => $product->file_url ? asset('storage/' . $product->file_url) : null,
                 'is_dynamic_price' => $isDynamic,
@@ -121,18 +126,36 @@ class KasirController extends Controller
 
             $storeId = (int) ($request->user()?->store_id ?? 0);
             $items = $this->buildCartItems($cart, $storeId);
-            $subtotal = (float) collect($items)->sum('subtotal');
+            $grossSubtotal = (float) collect($items)->sum(fn($i) => (float)$i['quantity'] * (float)$i['unit_price']);
 
-            DB::transaction(function () use ($request, $items, $subtotal) {
+            $discountType = $request->input('discount_type', 'rp');
+            $discountVal = (float) $request->input('discount_value', $request->input('discount', 0));
+            
+            $discountAmount = 0.0;
+            $totalAmount = $grossSubtotal;
+
+            if ($grossSubtotal > 0 && $discountVal > 0) {
+                if ($discountType === 'percent') {
+                    $rawAfter = $grossSubtotal * (1 - (min(100, max(0, $discountVal)) / 100));
+                    $totalAmount = ceil($rawAfter / 500) * 500;
+                    if ($totalAmount > $grossSubtotal) $totalAmount = $grossSubtotal;
+                    $discountAmount = max(0, $grossSubtotal - $totalAmount);
+                } else {
+                    $discountAmount = min($grossSubtotal, max(0, $discountVal));
+                    $totalAmount = max(0, $grossSubtotal - $discountAmount);
+                }
+            }
+
+            DB::transaction(function () use ($request, $items, $grossSubtotal, $discountAmount, $totalAmount) {
                 $transaction = Transaction::create([
                     'store_id'       => $request->user()->store_id,
                     'user_id'        => $request->user()->user_id,
                     'waiter_id'      => $request->user()->role === 'pelayan' ? $request->user()->user_id : null,
                     'cashier_id'     => in_array($request->user()->role, ['cashier', 'owner', 'admin']) ? $request->user()->user_id : null,
-                    'subtotal'       => $subtotal,
+                    'subtotal'       => $grossSubtotal,
                     'tax'            => 0,
-                    'discount'       => 0,
-                    'total_amount'   => $subtotal,
+                    'discount'       => $discountAmount,
+                    'total_amount'   => $totalAmount,
                     'status'         => 'pending_payment',
                     'payment_method' => null,
                     'customer_type'  => 'walkin',
@@ -293,32 +316,51 @@ class KasirController extends Controller
         $storeId = (int) ($request->user()?->store_id ?? 0);
         $items = $this->buildCartItems($cart, $storeId);
 
-        $subtotal = (float) collect($items)->sum('subtotal');
+        $grossSubtotal = (float) collect($items)->sum(fn($i) => (float)$i['quantity'] * (float)$i['unit_price']);
+
+        $discountType = $request->input('discount_type', 'rp');
+        $discountVal = (float) $request->input('discount_value', $request->input('discount', 0));
+        
+        $discountAmount = 0.0;
+        $totalAmount = $grossSubtotal;
+
+        if ($grossSubtotal > 0 && $discountVal > 0) {
+            if ($discountType === 'percent') {
+                $rawAfter = $grossSubtotal * (1 - (min(100, max(0, $discountVal)) / 100));
+                $totalAmount = ceil($rawAfter / 500) * 500;
+                if ($totalAmount > $grossSubtotal) $totalAmount = $grossSubtotal;
+                $discountAmount = max(0, $grossSubtotal - $totalAmount);
+            } else {
+                $discountAmount = min($grossSubtotal, max(0, $discountVal));
+                $totalAmount = max(0, $grossSubtotal - $discountAmount);
+            }
+        }
+
         $payment = (float) $payload['payment'];
 
         if ($payload['payment_method'] === 'qris') {
-            $payment = $subtotal;
+            $payment = $totalAmount;
         } else {
-            if ($payment < $subtotal) {
+            if ($payment < $totalAmount) {
                 throw ValidationException::withMessages([
                     'payment' => 'Nominal pembayaran kurang dari total belanja.',
                 ]);
             }
         }
 
-        $cashPaid = $payload['payment_method'] === 'qris' ? $subtotal : $payment;
-        $cashChange = $payload['payment_method'] === 'qris' ? 0.00 : max(0.00, $payment - $subtotal);
+        $cashPaid = $payload['payment_method'] === 'qris' ? $totalAmount : $payment;
+        $cashChange = $payload['payment_method'] === 'qris' ? 0.00 : max(0.00, $payment - $totalAmount);
 
-        $transaction = DB::transaction(function () use ($request, $items, $subtotal, $payload, $cashPaid, $cashChange) {
+        $transaction = DB::transaction(function () use ($request, $items, $grossSubtotal, $discountAmount, $totalAmount, $payload, $cashPaid, $cashChange) {
             $transaction = Transaction::create([
                 'store_id'       => $request->user()->store_id,
                 'user_id'        => $request->user()->user_id,
                 'waiter_id'      => $request->user()->role === 'pelayan' ? $request->user()->user_id : null,
                 'cashier_id'     => in_array($request->user()->role, ['cashier', 'owner', 'admin']) ? $request->user()->user_id : null,
-                'subtotal'       => $subtotal,
+                'subtotal'       => $grossSubtotal,
                 'tax'            => 0,
-                'discount'       => 0,
-                'total_amount'   => $subtotal,
+                'discount'       => $discountAmount,
+                'total_amount'   => $totalAmount,
                 'status'         => 'completed',
                 'payment_method' => $payload['payment_method'],
                 'cash_paid'      => $cashPaid,
@@ -637,6 +679,8 @@ class KasirController extends Controller
                     'transaction_code' => $trx->transaction_code,
                     'served_by' => $trx->user?->name ?? '-',
                     'customer_name' => $trx->customer_name ?? 'Pelanggan Umum',
+                    'subtotal' => (float) ($trx->subtotal > 0 ? $trx->subtotal : ($trx->total_amount + ($trx->discount ?? 0))),
+                    'discount' => (float) ($trx->discount ?? 0),
                     'total_amount' => (float) $trx->total_amount,
                     'created_at' => optional($trx->created_at)->format('d/m/Y H:i'),
                     'items' => $trx->items->map(function ($item) {
@@ -672,20 +716,47 @@ class KasirController extends Controller
             'payment_method' => ['required', 'in:cash,qris'],
             'payment' => ['required', 'numeric', 'min:0'],
             'customer_name' => ['nullable', 'string', 'max:100'],
+            'discount_type' => ['nullable', 'string'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $total = (float) $transaction->total_amount;
+        $subtotal = (float) ($transaction->subtotal > 0 ? $transaction->subtotal : ($transaction->total_amount + ($transaction->discount ?? 0)));
+        $discountAmount = (float) ($transaction->discount ?? 0);
+        $totalAmount = (float) $transaction->total_amount;
+
+        if ($request->has('discount_value') || $request->has('discount')) {
+            $discountType = $request->input('discount_type', 'rp');
+            $discountVal = (float) $request->input('discount_value', $request->input('discount', 0));
+            if ($subtotal > 0 && $discountVal > 0) {
+                if ($discountType === 'percent') {
+                    $rawAfter = $subtotal * (1 - (min(100, max(0, $discountVal)) / 100));
+                    $totalAmount = ceil($rawAfter / 500) * 500;
+                    if ($totalAmount > $subtotal) $totalAmount = $subtotal;
+                    $discountAmount = max(0, $subtotal - $totalAmount);
+                } else {
+                    $discountAmount = min($subtotal, max(0, $discountVal));
+                    $totalAmount = max(0, $subtotal - $discountAmount);
+                }
+            } else if ($discountVal == 0) {
+                $discountAmount = 0.0;
+                $totalAmount = $subtotal;
+            }
+        }
+
         $payment = (float) $payload['payment'];
 
-        if ($payload['payment_method'] !== 'qris' && $payment < $total) {
+        if ($payload['payment_method'] !== 'qris' && $payment < $totalAmount) {
             return response()->json(['message' => 'Nominal pembayaran kurang dari total belanja.'], 422);
         }
 
-        $cashPaid = $payload['payment_method'] === 'qris' ? $total : $payment;
-        $cashChange = $payload['payment_method'] === 'qris' ? 0.00 : max(0.00, $payment - $total);
+        $cashPaid = $payload['payment_method'] === 'qris' ? $totalAmount : $payment;
+        $cashChange = $payload['payment_method'] === 'qris' ? 0.00 : max(0.00, $payment - $totalAmount);
 
-        DB::transaction(function () use ($transaction, $payload, $request, $cashPaid, $cashChange): void {
+        DB::transaction(function () use ($transaction, $payload, $request, $cashPaid, $cashChange, $subtotal, $discountAmount, $totalAmount): void {
             $transaction->update([
+                'subtotal' => $subtotal,
+                'discount' => $discountAmount,
+                'total_amount' => $totalAmount,
                 'status' => 'completed',
                 'payment_method' => $payload['payment_method'],
                 'cash_paid' => $cashPaid,
@@ -761,16 +832,9 @@ class KasirController extends Controller
             ->where('store_id', $storeId)
             ->where('status', 'completed');
 
-        if ($request->user()?->role === 'pelayan') {
-            $query->where(function ($q) use ($request) {
-                $q->where('user_id', $request->user()->user_id)
-                  ->orWhere('waiter_id', $request->user()->user_id);
-            });
-        }
-
         $transactions = $query
+            ->where('created_at', '>=', now()->subDays(7)->startOfDay())
             ->orderBy('created_at', 'desc')
-            ->limit(100)
             ->get()
             ->map(function ($txn) {
                 return [
@@ -958,7 +1022,7 @@ class KasirController extends Controller
             'image'         => ['nullable', 'image', 'max:2048'],
         ]);
 
-        $storeId = $request->user()->store_id;
+        $storeId = (int) ($request->input('store_id') ?: ($request->user()?->store_id ?: 0));
         if (!$storeId) {
             return response()->json(['message' => 'User tidak terasosiasi dengan Store mana pun.'], 422);
         }
@@ -967,16 +1031,23 @@ class KasirController extends Controller
         $variant = trim($request->input('variant') ?: '-');
         $unit = trim($request->input('unit') ?: '-');
 
-        // Check if exact same product_name and variant already exists (case-insensitive & trimmed)
+        // Check if exact same product_name and variant already exists in master product table
         $existingProduct = Product::whereRaw('LOWER(TRIM(product_name)) = ?', [mb_strtolower($productName)])
             ->whereRaw('LOWER(TRIM(variant)) = ?', [mb_strtolower($variant)])
             ->first();
 
         if ($existingProduct) {
-            $variantText = ($variant !== '' && $variant !== '-') ? " dengan variasi '{$variant}'" : "";
-            return response()->json([
-                'message' => "Produk '{$productName}'{$variantText} sudah ada di sistem! Silakan gunakan nama variasi lain.",
-            ], 422);
+            // Check if THIS store branch already has a stock level record for this product
+            $hasStockInThisStore = StockLevel::where('store_id', $storeId)
+                ->where('product_id', $existingProduct->product_id)
+                ->exists();
+
+            if ($hasStockInThisStore) {
+                $variantText = ($variant !== '' && $variant !== '-') ? " dengan variasi '{$variant}'" : "";
+                return response()->json([
+                    'message' => "Produk '{$productName}'{$variantText} sudah ada di toko cabang ini! Silakan pilih dari daftar produk atau ubah nama variasi.",
+                ], 422);
+            }
         }
 
         $fileUrl = null;
@@ -993,16 +1064,23 @@ class KasirController extends Controller
             }
         }
 
-        $product = DB::transaction(function () use ($request, $storeId, $productName, $variant, $unit, $fileUrl) {
-            $product = Product::create([
-                'category_id'    => $request->input('category_id'),
-                'product_name'  => $productName,
-                'variant'       => $variant,
-                'unit'          => $unit,
-                'purchase_price'=> 0,
-                'selling_price' => $request->input('selling_price'),
-                'file_url'      => $fileUrl,
-            ]);
+        $product = DB::transaction(function () use ($request, $storeId, $existingProduct, $productName, $variant, $unit, $fileUrl) {
+            if ($existingProduct) {
+                $product = $existingProduct;
+                if ($fileUrl && empty($product->file_url)) {
+                    $product->update(['file_url' => $fileUrl]);
+                }
+            } else {
+                $product = Product::create([
+                    'category_id'    => $request->input('category_id'),
+                    'product_name'  => $productName,
+                    'variant'       => $variant,
+                    'unit'          => $unit,
+                    'purchase_price'=> 0,
+                    'selling_price' => $request->input('selling_price'),
+                    'file_url'      => $fileUrl,
+                ]);
+            }
 
             StockLevel::updateOrCreate([
                 'store_id'   => $storeId,
@@ -1022,7 +1100,7 @@ class KasirController extends Controller
                 'old_quantity'    => 0,
                 'new_quantity'    => $request->input('initial_stock') ?? 0,
                 'quantity_change' => $request->input('initial_stock') ?? 0,
-                'notes'           => 'Stok awal produk baru yang ditambahkan dari Kasir',
+                'notes'           => 'Stok awal produk baru yang ditambahkan dari Kasir untuk toko ini',
             ]);
 
             return $product;
@@ -1238,6 +1316,74 @@ class KasirController extends Controller
             'totalQtySold' => $totalQtySold,
             'productsSummary' => array_values($productSummaryMap),
             'transactions' => $transactions,
+        ]);
+    }
+
+    public function reportSalesByHour(Request $request)
+    {
+        $date = $request->input('date', date('Y-m-d'));
+        $selectedHour = (int) $request->input('hour', 21);
+        $storeId = $request->user()?->store_id;
+
+        if (!$storeId) {
+            $storeId = \App\Models\Store::query()->value('store_id');
+        }
+
+        if (!Schema::hasTable('transactions') || !Schema::hasTable('transaction_items') || !Schema::hasTable('products')) {
+            return response()->json([
+                'status' => 'success',
+                'date' => $date,
+                'store_id' => $storeId,
+                'selected_hour' => $selectedHour,
+                'total_unit' => 0,
+                'hourly' => [],
+                'products' => [],
+            ]);
+        }
+
+        $hourly = DB::table('transactions as t')
+            ->join('transaction_items as ti', 'ti.transaction_id', '=', 't.transaction_id')
+            ->where('t.store_id', $storeId)
+            ->where('t.status', 'completed')
+            ->whereDate('t.created_at', $date)
+            ->selectRaw("HOUR(t.created_at) as hour, SUM(ti.quantity) as total_unit")
+            ->groupBy(DB::raw('HOUR(t.created_at)'))
+            ->orderBy('hour')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'hour' => (int) $row->hour,
+                    'label' => sprintf('%02d:00', (int) $row->hour),
+                    'total_unit' => (int) $row->total_unit,
+                ];
+            })
+            ->toArray();
+
+        $selectedHourData = DB::table('transactions as t')
+            ->join('transaction_items as ti', 'ti.transaction_id', '=', 't.transaction_id')
+            ->join('products as p', 'p.product_id', '=', 'ti.product_id')
+            ->where('t.store_id', $storeId)
+            ->where('t.status', 'completed')
+            ->whereDate('t.created_at', $date)
+            ->whereRaw('HOUR(t.created_at) = ?', [$selectedHour])
+            ->selectRaw('p.product_name, SUM(ti.quantity) as total_unit')
+            ->groupBy('p.product_id', 'p.product_name')
+            ->orderByDesc('total_unit')
+            ->get();
+
+        $totalUnit = (int) collect($selectedHourData)->sum('total_unit');
+
+        return response()->json([
+            'status' => 'success',
+            'date' => $date,
+            'store_id' => $storeId,
+            'selected_hour' => $selectedHour,
+            'total_unit' => $totalUnit,
+            'hourly' => $hourly,
+            'products' => $selectedHourData->map(fn($item) => [
+                'product_name' => $item->product_name,
+                'total_unit' => (int) $item->total_unit,
+            ])->values()->all(),
         ]);
     }
 }

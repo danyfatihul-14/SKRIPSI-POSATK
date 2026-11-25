@@ -57,8 +57,8 @@ class EditProduct extends EditRecord
         $data['product_name']   = $this->record->product_name;
         $data['category_id']    = $this->record->category_id;
         $data['file_url']       = $this->record->file_url;
-        $data['purchase_price'] = (float) ($this->record->purchase_price ?? 0);
-        $data['selling_price']  = (float) ($this->record->selling_price ?? 0);
+        $data['purchase_price'] = ($stockLevel && $stockLevel->purchase_price > 0) ? (float) $stockLevel->purchase_price : (float) ($this->record->purchase_price ?? 0);
+        $data['selling_price']  = ($stockLevel && $stockLevel->unit_price > 0) ? (float) $stockLevel->unit_price : (float) ($this->record->selling_price ?? 0);
         $data['unit']           = $this->record->unit ?? 'biji';
         $data['variant']        = $this->record->variant ?? '';
 
@@ -80,6 +80,8 @@ class EditProduct extends EditRecord
         $newStoreId = isset($this->data['initial_store_id']) ? (int) $this->data['initial_store_id'] : null;
         $stock = max(0, (int) ($this->data['initial_stock'] ?? 0));
         $discount = max(0, (float) ($this->data['initial_discount'] ?? 0));
+        $purchasePrice = (float) ($this->data['purchase_price'] ?? $this->record->purchase_price ?? 0);
+        $sellingPrice = (float) ($this->data['selling_price'] ?? $this->record->selling_price ?? 0);
 
         if ($newStoreId) {
             // Jika toko diubah (oldStoreId beda dengan newStoreId), hapus record stok lama agar tidak menumpuk/duplikat
@@ -89,16 +91,22 @@ class EditProduct extends EditRecord
                     ->delete();
             }
 
+            $stockData = [
+                'quantity'   => $stock,
+                'unit_price' => $sellingPrice,
+                'discount'   => $discount,
+            ];
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('stock_levels', 'purchase_price')) {
+                $stockData['purchase_price'] = $purchasePrice;
+            }
+
             $stockLevel = StockLevel::updateOrCreate(
                 [
                     'store_id'   => $newStoreId,
                     'product_id' => $this->record->product_id,
                 ],
-                [
-                    'quantity'   => $stock,
-                    'unit_price' => (float) $this->record->selling_price,
-                    'discount'   => $discount,
-                ]
+                $stockData
             );
 
             // Log perubahan stok jika ada perubahan stok

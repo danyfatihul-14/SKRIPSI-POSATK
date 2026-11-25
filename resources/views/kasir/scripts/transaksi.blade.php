@@ -3,10 +3,25 @@
 
     function getActivePaymentSource() {
         if (window.selectedPendingTransaction) {
+            const rawSubtotal = Number(window.selectedPendingTransaction.subtotal || 0);
+            const rawDiscount = Number(window.selectedPendingTransaction.discount || 0);
+            const rawTotal = Number(window.selectedPendingTransaction.total_amount || 0);
+
+            const items = window.selectedPendingTransaction.items || [];
+            let grossSubtotal = items.reduce(function(sum, item) {
+                return sum + (Number(item.qty || 0) * Number(item.price || 0));
+            }, 0);
+
+            if (grossSubtotal <= 0) {
+                grossSubtotal = rawSubtotal > rawTotal ? rawSubtotal : (rawTotal + rawDiscount);
+            }
+
             return {
                 type: "pending",
-                total: Number(window.selectedPendingTransaction.total_amount || 0),
-                items: window.selectedPendingTransaction.items || [],
+                subtotal: grossSubtotal,
+                discount: rawDiscount,
+                total: rawTotal,
+                items: items,
                 code: window.selectedPendingTransaction.transaction_code || "-",
                 served_by: window.selectedPendingTransaction.served_by || "-",
                 created_at: window.selectedPendingTransaction.created_at || "-"
@@ -20,12 +35,14 @@
                 subtotal: Number(item.qty || 0) * Number(item.price || 0)
             };
         });
-        const total = items.reduce(function(sum, item) {
+        const grossSubtotal = items.reduce(function(sum, item) {
             return sum + item.subtotal;
         }, 0);
         return {
             type: "direct",
-            total: total,
+            subtotal: grossSubtotal,
+            discount: 0,
+            total: grossSubtotal,
             items: items,
             code: "-",
             served_by: "-",
@@ -63,12 +80,12 @@
 
     function renderOrderSummary() {
         const summary = document.getElementById("orderSummary");
-        const totalEl = document.getElementById("orderTotal");
         const cartInput = document.getElementById("cartInput");
         const pendingInput = document.getElementById("pendingTransactionId");
         const source = getActivePaymentSource();
+
         updatePaymentContextUI(source);
-        updateBreakdownUI(getBreakdown(source));
+
         if (!source.items.length) {
             if (summary) {
                 summary.innerHTML = "<div style='text-align:center; padding:24px 0; color:var(--dark-light); font-size:13px;'>Belum ada transaksi yang dipilih</div>";
@@ -77,6 +94,7 @@
                 subtotal: 0,
                 discount: 0,
                 tax: 0,
+                qrisFee: 0,
                 total: 0
             });
             if (cartInput) cartInput.value = "[]";
@@ -85,12 +103,17 @@
             updateChange();
             return;
         }
+
         let html = "";
         source.items.forEach(function(item) {
-            html += "<div style='display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--light);'>" + "<div style='flex:1;'>" + "<div style='font-weight:600; color:var(--dark); font-size:14px;'>" + item.product_name + "</div>" + "<div style='font-size:12px; color:var(--dark-light); margin-top:2px;'>x" + item.qty + " = Rp" + Number(item.subtotal).toLocaleString("id-ID") + "</div>" + "</div>" + "<div style='font-weight:700; color:var(--accent); font-size:14px; min-width:120px; text-align:right;'>Rp" + Number(item.subtotal).toLocaleString("id-ID") + "</div>" + "</div>";
+            const itemGross = Number(item.qty || 0) * Number(item.price || 0);
+            html += "<div style='display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--light);'>" + "<div style='flex:1;'>" + "<div style='font-weight:600; color:var(--dark); font-size:14px;'>" + item.product_name + "</div>" + "<div style='font-size:12px; color:var(--dark-light); margin-top:2px;'>x" + item.qty + " = Rp" + itemGross.toLocaleString("id-ID") + "</div>" + "</div>" + "<div style='font-weight:700; color:var(--accent); font-size:14px; min-width:120px; text-align:right;'>Rp" + itemGross.toLocaleString("id-ID") + "</div>" + "</div>";
         });
         if (summary) summary.innerHTML = html;
-        if (totalEl) totalEl.innerText = "Rp" + Number(source.total).toLocaleString("id-ID");
+
+        const breakdown = getBreakdown(source);
+        updateBreakdownUI(breakdown);
+
         if (window.selectedPendingTransaction) {
             if (cartInput) cartInput.value = getActiveCartPayload();
             if (pendingInput) pendingInput.value = window.selectedPendingTransaction.transaction_id;
@@ -98,7 +121,7 @@
             if (cartInput) cartInput.value = JSON.stringify(window.cart || []);
             if (pendingInput) pendingInput.value = "";
         }
-        renderQuickPay(source.total);
+        renderQuickPay(breakdown.total);
         updateChange();
     }
 
@@ -155,14 +178,46 @@
 
     function getBreakdown(source) {
         const method = (document.getElementById("paymentMethod") || {}).value || "cash";
-        const subtotal = Number(source.total || 0);
-        const discount = 0;
+        const grossSubtotal = Number(source.subtotal || 0);
+
+        const discountTypeEl = document.getElementById("checkoutDiscountType");
+        const discountValueEl = document.getElementById("checkoutDiscountValue");
+        const discountSymbolEl = document.getElementById("checkoutDiscountSymbol");
+        const discountNoteEl = document.getElementById("checkoutDiscountNote");
+
+        const discountType = discountTypeEl ? discountTypeEl.value : "rp";
+        const discountVal = discountValueEl ? parseFloat(discountValueEl.value || 0) : 0;
+
+        if (discountSymbolEl) {
+            discountSymbolEl.innerText = discountType === "percent" ? "%" : "Rp";
+        }
+        if (discountNoteEl) {
+            discountNoteEl.style.display = discountType === "percent" ? "block" : "none";
+        }
+
+        let discountAmount = 0;
+        let discountedSubtotal = grossSubtotal;
+
+        if (grossSubtotal > 0 && discountVal > 0) {
+            if (discountType === "percent") {
+                const rawAfter = grossSubtotal * (1 - (Math.min(100, Math.max(0, discountVal)) / 100));
+                // Round UP to nearest 500
+                discountedSubtotal = Math.ceil(rawAfter / 500) * 500;
+                if (discountedSubtotal > grossSubtotal) discountedSubtotal = grossSubtotal;
+                discountAmount = Math.max(0, grossSubtotal - discountedSubtotal);
+            } else {
+                discountAmount = Math.min(grossSubtotal, Math.max(0, discountVal));
+                discountedSubtotal = Math.max(0, grossSubtotal - discountAmount);
+            }
+        }
+
         const tax = 0;
-        const qrisFee = method === "qris" ? getQrisFee(subtotal) : 0;
-        const total = subtotal - discount + tax + qrisFee;
+        const qrisFee = method === "qris" ? getQrisFee(discountedSubtotal) : 0;
+        const total = discountedSubtotal + tax + qrisFee;
+
         return {
-            subtotal: subtotal,
-            discount: discount,
+            subtotal: grossSubtotal,
+            discount: discountAmount,
             tax: tax,
             qrisFee: qrisFee,
             total: total
@@ -236,6 +291,8 @@
         if (!window.selectedPendingTransaction) return Promise.resolve();
 
         const customerName = document.getElementById('customerName')?.value || 'Pelanggan Umum';
+        const discountTypeInput = document.getElementById("checkoutDiscountType");
+        const discountValueInput = document.getElementById("checkoutDiscountValue");
 
         return fetch("/kasir/pending/" + window.selectedPendingTransaction.transaction_id + "/pay", {
             method: "POST",
@@ -247,7 +304,9 @@
             body: JSON.stringify({
                 payment_method: paymentMethod,
                 payment: Number(payment || 0),
-                customer_name: customerName
+                customer_name: customerName,
+                discount_type: discountTypeInput ? discountTypeInput.value : "rp",
+                discount_value: discountValueInput ? discountValueInput.value : 0
             })
         }).then(async function(r) {
             const raw = await r.text();
@@ -268,7 +327,7 @@
             if (typeof renderPendingList === "function") renderPendingList();
             if (typeof fetchProducts === "function") {
                 const searchInput = document.getElementById('productSearch');
-                fetchProducts(searchInput ? searchInput.value : '');
+                fetchProducts(searchInput ? searchInput.value : '', true);
             }
         });
         setWaitingPaymentBadge(pendingList.length);
@@ -461,12 +520,17 @@
         const form = document.getElementById("paymentForm");
         if (!form) throw new Error("Form pembayaran tidak ditemukan.");
 
+        const discountTypeInput = document.getElementById("checkoutDiscountType");
+        const discountValueInput = document.getElementById("checkoutDiscountValue");
+
         const payload = new URLSearchParams();
         payload.append("_token", document.querySelector("[name='_token']").value);
         payload.append("cart", document.getElementById("cartInput")?.value || "[]");
         payload.append("payment_method", paymentMethod);
         payload.append("payment", String(Number(payment || 0)));
         payload.append("customer_name", document.getElementById("customerName")?.value || "Pelanggan Umum");
+        payload.append("discount_type", discountTypeInput ? discountTypeInput.value : "rp");
+        payload.append("discount_value", discountValueInput ? discountValueInput.value : "0");
 
         const res = await fetch(form.action, {
             method: "POST",
@@ -502,7 +566,7 @@
         if (typeof renderPendingList === "function") renderPendingList();
         if (typeof fetchProducts === "function") {
             const searchInput = document.getElementById('productSearch');
-            fetchProducts(searchInput ? searchInput.value : '');
+            fetchProducts(searchInput ? searchInput.value : '', true);
         }
         if (typeof showPage === "function") showPage("kasir");
 

@@ -513,12 +513,24 @@
                 @endforeach
             </div>
 
+            @php
+                $trxSubtotal = (float) $transaction->subtotal;
+                $trxDiscount = (float) $transaction->discount;
+                $trxTotal = (float) $transaction->total_amount;
+                if ($trxDiscount > 0 && $trxSubtotal <= $trxTotal) {
+                    $trxSubtotal = $trxTotal + $trxDiscount;
+                }
+                if ($trxSubtotal == 0) {
+                    $trxSubtotal = $trxTotal + $trxDiscount;
+                }
+            @endphp
+
             <!-- Summary -->
             <div class="thermal-divider"></div>
             <div class="thermal-summary">
                 <div class="thermal-summary-row">
                     <span>Subtotal</span>
-                    <span>Rp{{ number_format($transaction->subtotal, 0, ',', '.') }}</span>
+                    <span>Rp{{ number_format($trxSubtotal, 0, ',', '.') }}</span>
                 </div>
                 @if ($transaction->tax > 0)
                 <div class="thermal-summary-row">
@@ -526,10 +538,10 @@
                     <span>Rp{{ number_format($transaction->tax, 0, ',', '.') }}</span>
                 </div>
                 @endif
-                @if ($transaction->discount > 0)
+                @if ($trxDiscount > 0)
                 <div class="thermal-summary-row">
-                    <span>Diskon</span>
-                    <span>Rp{{ number_format($transaction->discount, 0, ',', '.') }}</span>
+                    <span>Potongan Diskon</span>
+                    <span>-Rp{{ number_format($trxDiscount, 0, ',', '.') }}</span>
                 </div>
                 @endif
             </div>
@@ -537,7 +549,7 @@
             <!-- Total -->
             <div class="thermal-total">
                 <span>TOTAL</span>
-                <span>Rp{{ number_format($transaction->total_amount, 0, ',', '.') }}</span>
+                <span>Rp{{ number_format($trxTotal, 0, ',', '.') }}</span>
             </div>
 
             <!-- Payment Method -->

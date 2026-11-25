@@ -225,9 +225,35 @@
                         <span>Subtotal</span>
                         <span id="breakdownSubtotal">Rp0</span>
                     </div>
+
+                    {{-- Dynamic Discount Control --}}
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; margin:8px 0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-size:12px; font-weight:700; color:#334155; text-transform:uppercase;">Potongan Diskon</span>
+                            <select id="checkoutDiscountType" onchange="renderOrderSummary()" style="border:1px solid #cbd5e1; border-radius:6px; font-size:12px; font-weight:700; padding:4px 8px; background:white; cursor:pointer;">
+                                <option value="rp">Nominal (Rp)</option>
+                                <option value="percent">Persen (%)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <input 
+                                type="number" 
+                                id="checkoutDiscountValue" 
+                                min="0" 
+                                value="0" 
+                                placeholder="0" 
+                                oninput="renderOrderSummary()" 
+                                style="width:100%; border:1px solid var(--accent); border-radius:8px; padding:8px 10px; font-size:14px; font-weight:700; outline:none; background:white;" />
+                            <span id="checkoutDiscountSymbol" style="font-size:13px; font-weight:700; color:#334155; min-width:30px; text-align:center;">Rp</span>
+                        </div>
+                        <div id="checkoutDiscountNote" style="font-size:11px; color:#2563eb; font-weight:600; margin-top:4px; display:none;">
+                            *Persen dibulatkan ke atas per Rp500 (Contoh: 18.399 → 18.500)
+                        </div>
+                    </div>
+
                     <div class="trx-breakdown-row">
-                        <span>Diskon</span>
-                        <span id="breakdownDiscount">Rp0</span>
+                        <span>Potongan Diskon</span>
+                        <span id="breakdownDiscount" style="color:#ef4444; font-weight:700;">-Rp0</span>
                     </div>
                     <div class="trx-breakdown-row">
                         <span>Pajak</span>

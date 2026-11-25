@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\KasirController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\AiChatController;
 
 Route::get('/', [PublicController::class, 'index'])->name('public.dashboard');
 Route::get('/catalog', [PublicController::class, 'catalog'])->name('public.catalog');
@@ -18,10 +19,18 @@ Route::get('/clear-cache', function () {
     return "Semua cache Laravel berhasil dibersihkan!";
 });
 
+// TEMPORARY: Cleanup route - HAPUS SETELAH DIJALANKAN
+Route::get('/cleanup-stock-kurnia-2026', function () {
+    $deleted = \Illuminate\Support\Facades\DB::table('stock_levels')->where('quantity', 0)->delete();
+    return "Selesai! Berhasil menghapus {$deleted} record stock_levels dengan quantity=0.";
+});
+
+
 Route::get('/login', [LoginController::class, 'show'])->name('login');
 Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::delete('/admin/products/{product}', [ProductController::class, 'destroy'])->name('admin.products.destroy');
+
 
 Route::middleware('auth')->group(function () {
     Route::get('/cashier', function () {
@@ -40,11 +49,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/kasir/transaction-history', [KasirController::class, 'transactionHistory'])->name('kasir.transaction-history');
     Route::get('/kasir/closing-report', [KasirController::class, 'closingReport'])->name('kasir.closing-report');
     Route::get('/kasir/closing-receipt', [KasirController::class, 'closingReceipt'])->name('kasir.closing-receipt');
+    Route::get('/kasir/report-sales-by-hour', [KasirController::class, 'reportSalesByHour'])->name('kasir.report-sales-by-hour');
     Route::post('/kasir/stok/adjust', [KasirController::class, 'adjustStock'])->name('kasir.stok.adjust');
     Route::post('/kasir/stok/convert', [KasirController::class, 'convertStock'])->name('kasir.stok.convert');
     Route::get('/kasir/categories', [KasirController::class, 'getCategories'])->name('kasir.categories');
     Route::post('/kasir/products', [KasirController::class, 'storeProduct'])->name('kasir.products.store');
     Route::post('/kasir/products/{product}/update-image', [KasirController::class, 'updateProductImage'])->name('kasir.products.update-image');
+
+    // AI Chat Analytics
+    Route::post('/ai/chat', [AiChatController::class, 'chat'])->name('ai.chat');
 });
 
 require __DIR__ . '/predictions.php';

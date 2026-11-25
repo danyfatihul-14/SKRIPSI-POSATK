@@ -147,7 +147,7 @@
                 closeStockAdjustModal();
                 initStockPage();
                 if (typeof fetchProducts === 'function') {
-                    fetchProducts('');
+                    fetchProducts('', true);
                 }
             } else {
                 window.showAlert(res.message || 'Gagal memperbarui stok.', 'error');
@@ -302,7 +302,7 @@
                     initStockPage();
                     // Also trigger reload of cashier products if the function exists
                     if (typeof fetchProducts === 'function') {
-                        fetchProducts('');
+                        fetchProducts('', true);
                     }
                 } else {
                     window.showAlert(res.message || 'Gagal melakukan konversi.', 'error');

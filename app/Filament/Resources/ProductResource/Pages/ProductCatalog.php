@@ -12,23 +12,24 @@ use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Livewire\WithPagination;
 
 class ProductCatalog extends Page
 {
+    use WithPagination;
+
     protected static string $resource = ProductResource::class;
     protected static string $view = 'filament.resources.product-resource.pages.product-catalog';
     protected static ?string $title = 'Product';
 
-    public ?int $storeId = null;
+    public $storeId = null;
     public array $stores = [];
-    public $products = [];
-    public $search = '';
+    public string $search = '';
     public string $missingFilter = ''; // '' | 'incomplete' | 'no_image' | 'no_category' | 'no_purchase_price'
-    public int $countNoImage = 0;
-    public int $countNoCategory = 0;
-    public int $countNoPurchasePrice = 0;
-    public int $countIncomplete = 0;
+    public array $selectedProductIds = [];
+    public bool $selectAllOnPage = false;
 
     protected function getHeaderActions(): array
     {
@@ -43,12 +44,92 @@ class ProductCatalog extends Page
     
     public function updatedStoreId(): void
     {
-        $this->loadProducts();
+        $this->selectedProductIds = [];
+        $this->selectAllOnPage = false;
+        $this->resetPage();
     }
 
     public function updatedMissingFilter(): void
     {
-        $this->loadProducts();
+        $this->selectedProductIds = [];
+        $this->selectAllOnPage = false;
+        $this->resetPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->selectedProductIds = [];
+        $this->selectAllOnPage = false;
+        $this->resetPage();
+    }
+
+    public function updatedSelectAllOnPage($value): void
+    {
+        if ($value) {
+            $viewData = $this->getViewData();
+            $products = $viewData['products'];
+            $this->selectedProductIds = $products->pluck('product_id')->map(fn($id) => (string) $id)->toArray();
+        } else {
+            $this->selectedProductIds = [];
+        }
+    }
+
+    public function updatedSelectedProductIds(): void
+    {
+        $viewData = $this->getViewData();
+        $products = $viewData['products'];
+        $pageIds = $products->pluck('product_id')->map(fn($id) => (string) $id)->toArray();
+
+        $allSelected = count($pageIds) > 0 && empty(array_diff($pageIds, $this->selectedProductIds));
+        $this->selectAllOnPage = $allSelected;
+    }
+
+    public function deleteSelectedProducts(): void
+    {
+        if (empty($this->selectedProductIds)) {
+            Notification::make()->warning()->title('Pilih setidaknya satu produk untuk dihapus')->send();
+            return;
+        }
+
+        $ids = array_values(array_map('intval', array_filter($this->selectedProductIds)));
+
+        if (empty($ids)) {
+            Notification::make()->warning()->title('Tidak ada produk valid yang dipilih')->send();
+            return;
+        }
+
+        DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+
+        $products = Product::whereIn('product_id', $ids)->get();
+        $count = $products->count();
+
+        $imagePaths = $products->pluck('file_url')->filter()->toArray();
+
+        DB::table('stock_levels')->whereIn('product_id', $ids)->delete();
+        DB::table('stock_logs')->whereIn('product_id', $ids)->delete();
+        DB::table('ml_predictions')->whereIn('product_id', $ids)->delete();
+        DB::table('transaction_items')->whereIn('product_id', $ids)->delete();
+        
+        Product::whereIn('product_id', $ids)->delete();
+
+        DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+
+        foreach ($imagePaths as $path) {
+            if (! empty($path)) {
+                $isUsed = Product::where('file_url', $path)->exists();
+                if (! $isUsed) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+        }
+
+        $this->selectedProductIds = [];
+        $this->selectAllOnPage = false;
+
+        Notification::make()
+            ->success()
+            ->title("Berhasil menghapus {$count} produk terpilih")
+            ->send();
     }
 
     public function mount(): void
@@ -57,46 +138,46 @@ class ProductCatalog extends Page
         $this->stores = Store::query()->pluck('name_store', 'store_id')->toArray();
         // Ambil store_id dari user aktif atau store pertama
         $this->storeId = Auth::user()->store_id ?? Store::query()->value('store_id');
-
-        $this->loadProducts();
     }
 
-    public function loadProducts(): void
+    protected function getViewData(): array
     {
-        $currentStoreId = $this->storeId ? (int) $this->storeId : null;
+        $currentStoreId = (!empty($this->storeId)) ? (int) $this->storeId : null;
 
-        $baseQuery = \App\Models\Product::query()->with('category');
-        if ($currentStoreId) {
-            $baseQuery->whereHas('stockLevels', function ($q) use ($currentStoreId) {
-                $q->where('store_id', $currentStoreId);
-            });
-        }
+        // Fast DB level aggregate count in a single query (~1ms)
+        $stats = DB::table('products')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.category_id')
+            ->when($currentStoreId, function ($q) use ($currentStoreId) {
+                $q->whereExists(function ($sub) use ($currentStoreId) {
+                    $sub->select(DB::raw(1))
+                        ->from('stock_levels')
+                        ->whereColumn('stock_levels.product_id', 'products.product_id')
+                        ->where('stock_levels.store_id', $currentStoreId);
+                });
+            })
+            ->selectRaw("
+                SUM(CASE WHEN products.file_url IS NULL OR products.file_url = '' THEN 1 ELSE 0 END) as count_no_image,
+                SUM(CASE WHEN products.category_id IS NULL THEN 1 ELSE 0 END) as count_no_category,
+                SUM(CASE WHEN (products.purchase_price IS NULL OR products.purchase_price <= 0) AND (categories.is_dynamic_price = 0 OR categories.is_dynamic_price IS NULL) THEN 1 ELSE 0 END) as count_no_purchase_price,
+                SUM(CASE WHEN (products.file_url IS NULL OR products.file_url = '') OR products.category_id IS NULL OR ((products.purchase_price IS NULL OR products.purchase_price <= 0) AND (categories.is_dynamic_price = 0 OR categories.is_dynamic_price IS NULL)) THEN 1 ELSE 0 END) as count_incomplete
+            ")
+            ->first();
 
-        $allProds = $baseQuery->get();
-        $this->countNoImage = $allProds->filter(fn($p) => empty($p->file_url))->count();
-        $this->countNoCategory = $allProds->filter(fn($p) => empty($p->category_id))->count();
-        $this->countNoPurchasePrice = $allProds->filter(function ($p) {
-            $isDynamic = (bool) ($p->category?->is_dynamic_price ?? false);
-            return ! $isDynamic && (empty($p->purchase_price) || $p->purchase_price <= 0);
-        })->count();
+        $countNoImage = (int) ($stats->count_no_image ?? 0);
+        $countNoCategory = (int) ($stats->count_no_category ?? 0);
+        $countNoPurchasePrice = (int) ($stats->count_no_purchase_price ?? 0);
+        $countIncomplete = (int) ($stats->count_incomplete ?? 0);
 
-        $this->countIncomplete = $allProds->filter(function ($p) {
-            $isDynamic = (bool) ($p->category?->is_dynamic_price ?? false);
-            $hasNoImage = empty($p->file_url);
-            $hasNoCategory = empty($p->category_id);
-            $hasNoPurchasePrice = ! $isDynamic && (empty($p->purchase_price) || $p->purchase_price <= 0);
-
-            return $hasNoImage || $hasNoCategory || $hasNoPurchasePrice;
-        })->count();
-
-        $query = \App\Models\Product::query()
+        // Base Product Query
+        $query = Product::query()
             ->with(['category', 'stockLevels' => function ($q) use ($currentStoreId) {
                 if ($currentStoreId) {
                     $q->where('store_id', $currentStoreId);
                 }
             }]);
 
-        // Filter produk yang ada di store yang dipilih
+        // Filter: hanya tampilkan produk yang TERDAFTAR di cabang yang dipilih
+        // (punya record stock_levels untuk store_id tersebut, berapapun stoknya termasuk 0)
         if ($currentStoreId) {
             $query->whereHas('stockLevels', function ($q) use ($currentStoreId) {
                 $q->where('store_id', $currentStoreId);
@@ -110,9 +191,6 @@ class ProductCatalog extends Page
                     ->orWhere('variant', 'like', "%{$q}%")
                     ->orWhereHas('category', function ($catQuery) use ($q) {
                         $catQuery->where('category_name', 'like', "%{$q}%");
-                    })
-                    ->orWhereHas('stockLevels.store', function ($storeQuery) use ($q) {
-                        $storeQuery->where('name_store', 'like', "%{$q}%");
                     });
             });
         }
@@ -146,7 +224,11 @@ class ProductCatalog extends Page
             });
         }
 
-        $this->products = $query->get()->map(function ($product) use ($currentStoreId) {
+        $paginatedProducts = $query->orderBy('product_name')->paginate(50);
+
+
+        // Transform paginated items safely
+        $paginatedProducts->getCollection()->transform(function ($product) use ($currentStoreId) {
             $stockLevel = $currentStoreId
                 ? $product->stockLevels->firstWhere('store_id', $currentStoreId)
                 : $product->stockLevels->first();
@@ -163,26 +245,32 @@ class ProductCatalog extends Page
                 $missing[] = 'Tanpa Harga Beli';
             }
 
-            return [
-                'product_id'     => $product->product_id,
-                'product_name'   => $product->product_name,
-                'variant'        => $product->variant ?: '-',
-                'unit'           => $product->unit ?? '-',
-                'category_name'  => $product->category?->category_name ?? null,
-                'category_id'    => $product->category_id,
-                'is_dynamic'     => $isDynamic,
-                'file_url'       => $product->file_url,
-                'purchase_price' => (float) ($product->purchase_price ?? 0),
-                'selling_price'  => (float) ($product->selling_price ?? 0),
-                'stock'          => (int) ($stockLevel?->quantity ?? 0),
-                'discount'       => (float) ($stockLevel?->discount ?? 0),
-                'missing'        => $missing,
-            ];
-        })->toArray();
+            $product->formatted_stock = (int) ($stockLevel?->quantity ?? 0);
+            $product->formatted_discount = (float) ($stockLevel?->discount ?? 0);
+            if ($stockLevel?->purchase_price && $stockLevel->purchase_price > 0) {
+                $product->purchase_price = $stockLevel->purchase_price;
+            }
+            if ($stockLevel?->unit_price && $stockLevel->unit_price > 0) {
+                $product->selling_price = $stockLevel->unit_price;
+            }
+            $product->missing_tags = $missing;
+            $product->is_dynamic = $isDynamic;
+
+            return $product;
+        });
+
+        return [
+            'products' => $paginatedProducts,
+            'countNoImage' => $countNoImage,
+            'countNoCategory' => $countNoCategory,
+            'countNoPurchasePrice' => $countNoPurchasePrice,
+            'countIncomplete' => $countIncomplete,
+        ];
     }
 
     public function deleteProduct(int|string $productId): void
     {
+        $productId = (int) $productId;
         $product = Product::query()->find($productId);
 
         if (! $product) {
@@ -190,35 +278,63 @@ class ProductCatalog extends Page
             return;
         }
 
-        $imagePath = $product->file_url;
+        $currentStoreId = $this->storeId ?? Auth::user()?->store_id;
 
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
-        $product->delete();
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+        if ($currentStoreId) {
+            // Jika filter cabang aktif: hapus HANYA StockLevel cabang ini
+            DB::table('stock_levels')
+                ->where('product_id', $productId)
+                ->where('store_id', $currentStoreId)
+                ->delete();
 
-        // hapus file jika tidak dipakai produk lain
-        if (! empty($imagePath)) {
-            $isUsedByOther = Product::query()
-                ->where('file_url', $imagePath)
+            // Cek apakah masih ada cabang lain yang punya stok produk ini
+            $stillUsedByOtherStores = DB::table('stock_levels')
+                ->where('product_id', $productId)
                 ->exists();
 
-            if (! $isUsedByOther) {
-                Storage::disk('public')->delete($imagePath);
+            if (! $stillUsedByOtherStores) {
+                // Tidak ada cabang lain yang menggunakan produk ini, hapus master + data terkait
+                $imagePath = $product->file_url;
+
+                DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+                DB::table('stock_logs')->where('product_id', $productId)->delete();
+                DB::table('ml_predictions')->where('product_id', $productId)->delete();
+                DB::table('transaction_items')->where('product_id', $productId)->delete();
+                $product->delete();
+                DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+
+                if (! empty($imagePath)) {
+                    $isUsedByOther = Product::query()->where('file_url', $imagePath)->exists();
+                    if (! $isUsedByOther) {
+                        Storage::disk('public')->delete($imagePath);
+                    }
+                }
             }
-        }
 
-        Notification::make()->success()->title('Produk berhasil dihapus')->send();
+            Notification::make()->success()->title('Produk berhasil dihapus dari cabang ini')->send();
+        } else {
+            // Tidak ada filter cabang: hapus master produk + semua stok di semua cabang
+            $imagePath = $product->file_url;
 
-        // kalau punya method refresh list:
-        if (method_exists($this, 'loadProducts')) {
-            $this->loadProducts();
+            DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+            DB::table('stock_levels')->where('product_id', $productId)->delete();
+            DB::table('stock_logs')->where('product_id', $productId)->delete();
+            DB::table('ml_predictions')->where('product_id', $productId)->delete();
+            DB::table('transaction_items')->where('product_id', $productId)->delete();
+            $product->delete();
+            DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+
+            if (! empty($imagePath)) {
+                $isUsedByOther = Product::query()->where('file_url', $imagePath)->exists();
+                if (! $isUsedByOther) {
+                    Storage::disk('public')->delete($imagePath);
+                }
+            }
+
+            Notification::make()->success()->title('Produk berhasil dihapus')->send();
         }
     }
 
-    public function updatedSearch(): void
-    {
-        $this->loadProducts();
-    }
 
     public function predictProduct(int|string $productId): void
     {

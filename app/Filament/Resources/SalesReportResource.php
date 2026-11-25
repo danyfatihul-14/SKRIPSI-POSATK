@@ -10,9 +10,9 @@ class SalesReportResource extends Resource
 {
     protected static ?string $model = Transaction::class;
 
-    protected static ?string $navigationGroup = 'Laporan';
+    protected static ?string $navigationGroup = null;
     protected static ?string $navigationLabel = 'Laporan Penjualan';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 6;
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
     public static function form(\Filament\Forms\Form $form): \Filament\Forms\Form

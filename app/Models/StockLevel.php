@@ -15,16 +15,18 @@ class StockLevel extends Model
         'store_id',
         'product_id',
         'quantity',
+        'purchase_price',
         'unit_price',
         'discount',
         'subtotal',
     ];
 
     protected $casts = [
-        'quantity'   => 'integer',
-        'unit_price' => 'decimal:2',
-        'discount'   => 'decimal:2',
-        'subtotal'   => 'decimal:2',
+        'quantity'       => 'integer',
+        'purchase_price' => 'decimal:2',
+        'unit_price'     => 'decimal:2',
+        'discount'       => 'decimal:2',
+        'subtotal'       => 'decimal:2',
     ];
 
     protected static function booted(): void

@@ -50,4 +50,12 @@ return [
         'enabled' => env('ML_ENABLED', true),
     ],
 
+    // =============================================
+    // GROQ AI CONFIGURATION
+    // =============================================
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        'model'   => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
+    ],
+
 ];

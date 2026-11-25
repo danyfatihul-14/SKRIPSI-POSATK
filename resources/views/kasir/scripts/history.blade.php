@@ -61,6 +61,13 @@
         if (!historyList) return;
 
         if (transactions.length === 0) {
+            const dateFilter = document.getElementById('historyDateFilter')?.value || '';
+            const emptyMsg = dateFilter
+                ? `Tidak ada transaksi pada tanggal ${formatDateDisplay(dateFilter)}`
+                : 'Tidak ada hasil pencarian';
+            const emptyHint = dateFilter
+                ? 'Coba pilih tanggal lain atau klik Reset untuk melihat semua'
+                : 'Coba gunakan kata kunci yang berbeda';
             historyList.innerHTML = `
                 <div class="history-empty">
                     <div class="history-empty-icon">
@@ -68,8 +75,8 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
-                    <p class="history-empty-title">Tidak ada hasil pencarian</p>
-                    <p>Coba gunakan kata kunci yang berbeda</p>
+                    <p class="history-empty-title">${emptyMsg}</p>
+                    <p>${emptyHint}</p>
                 </div>
             `;
             return;
@@ -104,30 +111,66 @@
         `).join('');
     }
 
-    function searchHistory(query) {
-        const searchTerm = query.toLowerCase().trim();
+    function applyHistoryFilter() {
+        const searchTerm = (document.getElementById('historySearchInput')?.value || '').toLowerCase().trim();
+        const dateFilter = document.getElementById('historyDateFilter')?.value || '';
 
-        if (!searchTerm) {
-            filteredTransactions = [...allTransactions];
-        } else {
-            filteredTransactions = allTransactions.filter(txn => {
-                const id = String(txn.transaction_id || txn.id || txn.transaction_code || '').toLowerCase();
-                const cashier = String(txn.cashier_name || txn.served_by || '').toLowerCase();
-                const waiter = String(txn.waiter_name || '').toLowerCase();
-                const method = String(txn.payment_method || '').toLowerCase();
-                const notes = String(txn.notes || '').toLowerCase();
+        filteredTransactions = allTransactions.filter(txn => {
+            // --- text search ---
+            if (searchTerm) {
+                const id       = String(txn.transaction_id || txn.id || txn.transaction_code || '').toLowerCase();
+                const cashier  = String(txn.cashier_name || txn.served_by || '').toLowerCase();
+                const waiter   = String(txn.waiter_name || '').toLowerCase();
+                const method   = String(txn.payment_method || '').toLowerCase();
+                const notes    = String(txn.notes || '').toLowerCase();
                 const customer = String(txn.customer_name || '').toLowerCase();
-                
-                return id.includes(searchTerm) || 
-                       cashier.includes(searchTerm) || 
-                       waiter.includes(searchTerm) || 
-                       method.includes(searchTerm) ||
-                       notes.includes(searchTerm) ||
-                       customer.includes(searchTerm);
-            });
-        }
+
+                const textMatch = id.includes(searchTerm) ||
+                                  cashier.includes(searchTerm) ||
+                                  waiter.includes(searchTerm) ||
+                                  method.includes(searchTerm) ||
+                                  notes.includes(searchTerm) ||
+                                  customer.includes(searchTerm);
+                if (!textMatch) return false;
+            }
+
+            // --- filter tanggal (exact date match, timezone-aware) ---
+            if (dateFilter) {
+                // Konversi created_at (UTC) ke tanggal lokal user (YYYY-MM-DD)
+                const txnLocalDate = txn.created_at
+                    ? new Date(txn.created_at).toLocaleDateString('sv-SE') // sv-SE selalu YYYY-MM-DD
+                    : '';
+                if (txnLocalDate !== dateFilter) return false;
+            }
+
+            return true;
+        });
 
         renderHistoryList(filteredTransactions);
+    }
+
+    // Backward-compat alias (dipakai jika ada kode lama yang masih memanggil searchHistory)
+    function searchHistory(query) {
+        if (document.getElementById('historySearchInput')) {
+            document.getElementById('historySearchInput').value = query;
+        }
+        applyHistoryFilter();
+    }
+
+    function resetHistoryDateFilter() {
+        const el = document.getElementById('historyDateFilter');
+        if (el) el.value = '';
+        applyHistoryFilter();
+    }
+
+    function formatDateDisplay(dateStr) {
+        try {
+            // dateStr adalah YYYY-MM-DD dari input[type=date]
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y}`;
+        } catch (e) {
+            return dateStr;
+        }
     }
 
     function formatDateTime(dateStr) {

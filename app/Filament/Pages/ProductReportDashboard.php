@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 class ProductReportDashboard extends Page
 {
-    protected static ?string $navigationGroup = 'Laporan';
+    protected static ?string $navigationGroup = null;
     protected static ?string $navigationLabel = 'Laporan Produk';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 7;
     protected static ?string $navigationIcon = 'heroicon-o-cube';
     protected static string $view = 'filament.pages.product-report-dashboard';
 

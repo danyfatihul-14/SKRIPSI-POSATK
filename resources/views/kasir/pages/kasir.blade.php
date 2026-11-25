@@ -443,9 +443,44 @@
 
                 <div id="quickCartList" style="display:none; flex:1; overflow-y:auto; padding:12px; gap:10px; flex-direction:column; align-items:center;"></div>
                 <div class="cart-footer">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                        <span style="font-size:13px; color:var(--dark-light);">Total</span>
-                        <strong id="quickCartTotal" style="color:var(--accent);">Rp0</strong>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="font-size:13px; color:var(--dark-light);">Subtotal</span>
+                        <strong id="quickCartSubtotal" style="color:var(--dark);">Rp0</strong>
+                    </div>
+
+                    {{-- Diskon Input Box --}}
+                    <div style="margin-bottom:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase;">Potongan Diskon</label>
+                            <select id="quickDiscountType" onchange="renderQuickCartPanel()" style="border:1px solid #cbd5e1; border-radius:6px; font-size:11px; font-weight:700; padding:2px 6px; background:white; cursor:pointer;">
+                                <option value="rp">Nominal (Rp)</option>
+                                <option value="percent">Persen (%)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <input 
+                                type="number" 
+                                id="quickDiscountValue" 
+                                min="0" 
+                                value="0" 
+                                placeholder="0" 
+                                oninput="renderQuickCartPanel()" 
+                                style="width:100%; border:1px solid var(--accent); border-radius:6px; padding:6px 8px; font-size:13px; font-weight:700; outline:none; background:white;" />
+                            <span id="quickDiscountSymbol" style="font-size:12px; font-weight:700; color:#475569; min-width:24px; text-align:center;">Rp</span>
+                        </div>
+                        <div id="quickDiscountNote" style="font-size:10px; color:#2563eb; font-weight:600; margin-top:4px; display:none;">
+                            *Persen dibulatkan ke atas per Rp500
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="font-size:12px; color:#ef4444; font-weight:600;">Diskon</span>
+                        <strong id="quickCartDiscountDisplay" style="color:#ef4444;">-Rp0</strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px; border-top:1px dashed #e2e8f0; padding-top:6px;">
+                        <span style="font-size:14px; font-weight:700; color:var(--dark);">Total Akhir</span>
+                        <strong id="quickCartTotal" style="color:var(--accent); font-size:16px;">Rp0</strong>
                     </div>
 
                     <div style="margin-bottom:12px;">

@@ -1,4 +1,3 @@
-{{-- filepath: e:\Polinema\Semester8\Skripsi\pos\resources\views\auth\login.blade.php --}}
 <!doctype html>
 <html lang="id">
 
@@ -43,7 +42,7 @@
         }
 
         .card {
-            width: min(980px, 100%);
+            width: min(920px, 100%);
             display: grid;
             grid-template-columns: 1.1fr 1fr;
             border-radius: 20px;
@@ -54,7 +53,7 @@
         }
 
         .brand {
-            padding: 36px 32px;
+            padding: 40px 36px;
             background:
                 linear-gradient(135deg, rgba(245, 158, 11, 0.12), transparent 60%),
                 linear-gradient(0deg, #fff, #fff);
@@ -72,7 +71,7 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 999px;
             background: #fff2c6;
             color: #8a5a00;
@@ -82,22 +81,23 @@
 
         .brand h1 {
             margin: 0;
-            font-size: 32px;
-            line-height: 1.05;
+            font-size: 30px;
+            line-height: 1.15;
             letter-spacing: -0.02em;
+            color: #1e293b;
         }
 
         .brand p {
             margin: 0;
-            color: #5a5a5a;
+            color: #64748b;
             font-size: 14px;
-            max-width: 32ch;
+            line-height: 1.5;
         }
 
         .stripe {
-            margin-top: 12px;
-            height: 8px;
-            width: 140px;
+            margin-top: 8px;
+            height: 6px;
+            width: 120px;
             border-radius: 999px;
             background: linear-gradient(90deg, var(--sun), #ffd48a);
         }
@@ -107,7 +107,7 @@
             grid-template-columns: 20px 1fr;
             gap: 12px;
             font-size: 13px;
-            color: #5a5a5a;
+            color: #475569;
         }
 
         .feature span {
@@ -120,56 +120,62 @@
         }
 
         .form {
-            padding: 36px 32px;
+            padding: 40px 36px;
             background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .form h2 {
-            margin: 0 0 8px;
-            font-size: 20px;
+            margin: 0 0 6px;
+            font-size: 22px;
+            color: #0f172a;
         }
 
         .form .sub {
             margin: 0 0 20px;
             font-size: 13px;
-            color: #777;
+            color: #64748b;
         }
 
         .err {
             background: #fff1f2;
             color: #9f1239;
             border: 1px solid #fecdd3;
-            padding: 10px 12px;
+            padding: 10px 14px;
             border-radius: 10px;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
             font-size: 13px;
+            font-weight: 600;
         }
 
         label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
-            letter-spacing: 0.03em;
-            margin: 12px 0 6px;
+            letter-spacing: 0.05em;
+            color: #475569;
+            margin: 14px 0 6px;
         }
 
         input[type="text"],
-        input[type="password"],
-        input[type="text"].password-input {
+        input[type="password"] {
             width: 100%;
-            padding: 12px 12px;
-            border: 1px solid #e3e0da;
+            padding: 12px 14px;
+            border: 1px solid #cbd5e1;
             border-radius: 10px;
-            background: #fcfbf9;
+            background: #f8fafc;
             font-size: 14px;
+            color: #0f172a;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         input[type="text"]:focus,
-        input[type="password"]:focus,
-        input[type="text"].password-input:focus {
+        input[type="password"]:focus {
             outline: none;
             border-color: var(--sun);
+            background: #fff;
             box-shadow: 0 0 0 4px var(--ring);
         }
 
@@ -177,7 +183,7 @@
             position: relative;
         }
 
-        .password-wrap .password-input {
+        .password-wrap input {
             padding-right: 44px;
         }
 
@@ -188,52 +194,60 @@
             transform: translateY(-50%);
             border: 0;
             background: transparent;
-            color: #8b8b8b;
+            color: #94a3b8;
             cursor: pointer;
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             padding: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            border-radius: 6px;
+            transition: color 0.2s;
         }
 
         .toggle-password:hover {
-            color: #4f4f4f;
+            color: #475569;
+            background: #f1f5f9;
         }
 
         .toggle-password svg {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
         }
 
         .hidden {
-            display: none;
+            display: none !important;
         }
 
         .row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-top: 12px;
+            margin-top: 16px;
             font-size: 13px;
-            color: #666;
+            color: #64748b;
         }
 
         .row label {
             margin: 0;
             font-weight: 600;
             letter-spacing: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
         }
 
         .btn {
             width: 100%;
-            margin-top: 18px;
+            margin-top: 22px;
             background: linear-gradient(180deg, var(--sun), var(--sun-deep));
             color: #fff;
             border: 0;
-            padding: 12px 14px;
+            padding: 13px 16px;
             border-radius: 12px;
+            font-size: 14px;
             font-weight: 700;
             cursor: pointer;
             box-shadow: 0 12px 24px rgba(245, 158, 11, 0.25);
@@ -246,9 +260,9 @@
         }
 
         .foot {
-            margin-top: 12px;
+            margin-top: 18px;
             font-size: 12px;
-            color: #888;
+            color: #94a3b8;
             text-align: center;
         }
 
@@ -258,7 +272,11 @@
             }
 
             .brand {
-                padding-bottom: 20px;
+                padding: 28px 24px;
+            }
+
+            .form {
+                padding: 28px 24px;
             }
         }
     </style>
@@ -301,11 +319,11 @@
                     @csrf
 
                     <label for="username">USERNAME</label>
-                    <input id="username" name="username" type="text" value="{{ old('username') }}" required>
+                    <input id="username" name="username" type="text" value="{{ old('username') }}" placeholder="Masukkan username" required autofocus>
 
                     <label for="password">PASSWORD</label>
                     <div class="password-wrap">
-                        <input id="password" class="password-input" name="password" type="password" required>
+                        <input id="password" name="password" type="password" placeholder="Masukkan password" required>
                         <button type="button" id="togglePassword" class="toggle-password" aria-label="Tampilkan password">
                             {{-- eye (dibuka) --}}
                             <svg id="iconEye" class="hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -315,25 +333,12 @@
                                     d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
 
-                            {{-- eye-off (awal/tertutup) --}}
-                    <div class="field">
-                        <label class="label">Email atau Username</label>
-                        <div class="control">
-                            <input type="text" name="login" value="{{ old('login') }}" class="input" placeholder="Masukkan email atau username" required autofocus>
-                        </div>
-                        @error('login')
-                        <p class="error">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <div class="field">
-                        <label class="label">Password</label>
-                        <div class="control">
-                            <input type="password" name="password" class="input" placeholder="Masukkan password" required>
-                        </div>
-                        @error('password')
-                        <p class="error">{{ $message }}</p>
-                        @enderror
+                            {{-- eye-off (tertutup) --}}
+                            <svg id="iconEyeOff" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a10.05 10.05 0 012.722-4.144M6.343 6.343A9.96 9.96 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.97 9.97 0 01-4.132 5.411m0 0L21 21M3 3l18 18" />
+                            </svg>
+                        </button>
                     </div>
 
                     <div class="row">
@@ -341,10 +346,6 @@
                             <input type="checkbox" name="remember">
                             <span>Ingat saya</span>
                         </label>
-
-                        @if (Route::has('password.request'))
-                        <a href="{{ route('password.request') }}" class="forgot">Lupa password?</a>
-                        @endif
                     </div>
 
                     <button type="submit" class="btn">Masuk ke Sistem</button>

@@ -95,13 +95,39 @@
         return Array.from(map.values());
     }
 
-    function fetchProducts(keyword = '') {
-        fetch('/kasir/search?q=' + encodeURIComponent(keyword))
+    var allProductsCache = [];
+
+    function fetchProducts(keyword = '', forceRefresh = false) {
+        const input = document.getElementById('productSearch');
+        const currentKeyword = keyword || (input ? input.value : '');
+
+        if (allProductsCache.length > 0 && !forceRefresh) {
+            filterAndRenderProducts(currentKeyword);
+            return;
+        }
+
+        fetch('/kasir/search?q=')
             .then(r => r.json())
             .then(data => {
-                products = deduplicateProductsList(data);
-                renderProducts(products);
+                allProductsCache = deduplicateProductsList(data);
+                filterAndRenderProducts(currentKeyword);
             });
+    }
+
+    function filterAndRenderProducts(keyword = '') {
+        const q = (keyword || '').trim().toLowerCase();
+        if (!q) {
+            products = allProductsCache;
+        } else {
+            products = allProductsCache.filter(p => {
+                const name = (p.product_name || '').toLowerCase();
+                const variant = (p.variant || '').toLowerCase();
+                const cat = (p.category_name || '').toLowerCase();
+                const unit = (p.unit || '').toLowerCase();
+                return name.includes(q) || variant.includes(q) || cat.includes(q) || unit.includes(q);
+            });
+        }
+        renderProducts(products);
     }
 
     function setupProductSearch() {
@@ -109,12 +135,7 @@
         if (!input) return;
 
         input.addEventListener('input', function() {
-            const keyword = this.value || '';
-            clearTimeout(searchTimer);
-
-            searchTimer = setTimeout(() => {
-                fetchProducts(keyword);
-            }, 250);
+            filterAndRenderProducts(this.value || '');
         });
     }
 
@@ -241,13 +262,36 @@
                     ? `Rp${minPrice.toLocaleString('id-ID')}` 
                     : `Rp${minPrice.toLocaleString('id-ID')} - Rp${maxPrice.toLocaleString('id-ID')}`;
                 
-                const variantNames = group.map(p => getVariantDisplayName(p)).join(', ');
+                const rawVariantNames = group.map(p => getVariantDisplayName(p));
+                const allVariantNamesIdentical = rawVariantNames.length > 1 && rawVariantNames.every(n => n === rawVariantNames[0]);
+                const variantNames = allVariantNamesIdentical
+                    ? `${rawVariantNames[0]} (${group.length} opsi harga)`
+                    : rawVariantNames.join(', ');
                 const escapedName = firstProd.product_name.replace(/'/g, "\\'");
+
+                // Cek apakah semua varian punya harga DAN satuan yang sama
+                // Jika iya, tidak perlu modal -> langsung addCart produk pertama yang tersedia stoknya
+                const allSamePrice = prices.every(pr => pr === prices[0]);
+                const allSameUnit = group.every(p => (p.unit || '').toLowerCase() === (group[0].unit || '').toLowerCase());
+                const needVariantModal = !allSamePrice || !allSameUnit;
+
+                // Tentukan aksi klik: modal jika perlu pilih varian, langsung addCart jika semua sama
+                let clickAction = '';
+                if (!isOutOfStock) {
+                    if (needVariantModal) {
+                        clickAction = `openVariantModal('${escapedName}')`;
+                    } else {
+                        // Cari produk pertama yang masih ada stoknya
+                        const firstAvailProd = group.find(p => isDynamicPriceProduct(p) || ((p.stock ?? 0) - getCartQty(p.product_id) - getHeldQty(p.product_id)) > 0) || group[0];
+                        const escapedDisplayName = firstAvailProd.product_name.replace(/'/g, "\\'");
+                        clickAction = `addCart('${firstAvailProd.product_id}','${escapedDisplayName}',${firstAvailProd.selling_price})`;
+                    }
+                }
 
                 return `
                 <div class="product-card"
                     style="${isOutOfStock ? 'opacity: 0.55; cursor: not-allowed;' : ''}"
-                    onclick="${isOutOfStock ? '' : `openVariantModal('${escapedName}')`}">
+                    onclick="${clickAction}">
 
                     <div style="position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background: #f5f5f5;">
                         ${firstProd.image_url
@@ -258,7 +302,7 @@
                             Total Stok: ${isDynamicGroup ? 'Dinamis' : totalAvailableStock}
                         </div>
 
-                        <div style="position:absolute; bottom:8px; left:8px; background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; border:1px solid #bae6fd;">
+                        <div style="position:absolute; bottom:8px; left:8px; background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; border:1px solid #bae6fd; ${!needVariantModal ? 'display:none;' : ''}">
                             ${group.length} Varian
                         </div>
                     </div>
@@ -268,9 +312,13 @@
                             ${firstProd.product_name}
                         </div>
 
+                        ${needVariantModal ? `
                         <div style="font-size:11px; color:#2563eb; font-weight:600; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${variantNames}">
                             Varian: ${variantNames}
-                        </div>
+                        </div>` : `
+                        <div style="font-size:11px; color:#64748b; font-weight:500; margin-bottom:4px;">
+                            ${getVariantDisplayName(firstProd) !== 'Default' ? getVariantDisplayName(firstProd) : '-'}
+                        </div>`}
 
                         <div style="font-size:12px; color:var(--accent); margin-bottom:6px;">
                             Satuan: ${firstProd.unit}
@@ -427,19 +475,61 @@
         renderProducts(products);
     }
 
+    window.calculateDiscount = function(subtotal, val, type) {
+        subtotal = Number(subtotal || 0);
+        val = Number(val || 0);
+        if (subtotal <= 0 || val <= 0) {
+            return { discountAmount: 0, finalTotal: subtotal };
+        }
+        if (type === 'percent') {
+            const rawAfter = subtotal * (1 - (Math.min(100, Math.max(0, val)) / 100));
+            let finalTotal = Math.ceil(rawAfter / 500) * 500;
+            if (finalTotal > subtotal) finalTotal = subtotal;
+            return {
+                discountAmount: Math.max(0, subtotal - finalTotal),
+                finalTotal: finalTotal
+            };
+        }
+        const discountAmount = Math.min(subtotal, Math.max(0, val));
+        return {
+            discountAmount: discountAmount,
+            finalTotal: Math.max(0, subtotal - discountAmount)
+        };
+    };
+
     function renderQuickCartPanel() {
         const empty = document.getElementById('quickCartEmpty');
         const list = document.getElementById('quickCartList');
+        const subtotalEl = document.getElementById('quickCartSubtotal');
         const totalEl = document.getElementById('quickCartTotal');
         const countEl = document.getElementById('quickCartCount');
+        const discountDisplay = document.getElementById('quickCartDiscountDisplay');
+        const discountTypeEl = document.getElementById('quickDiscountType');
+        const discountValEl = document.getElementById('quickDiscountValue');
+        const discountSymbolEl = document.getElementById('quickDiscountSymbol');
+        const discountNoteEl = document.getElementById('quickDiscountNote');
 
         if (!empty || !list || !totalEl || !countEl) return;
 
+        const discountType = discountTypeEl ? discountTypeEl.value : 'rp';
+        const discountVal = discountValEl ? parseFloat(discountValEl.value || 0) : 0;
+
+        if (discountSymbolEl) {
+            discountSymbolEl.innerText = discountType === 'percent' ? '%' : 'Rp';
+        }
+        if (discountNoteEl) {
+            discountNoteEl.style.display = discountType === 'percent' ? 'block' : 'none';
+        }
+
         const totalQty = cart.reduce((s, i) => s + i.qty, 0);
-        const totalPrice = cart.reduce((s, i) => s + (i.qty * i.price), 0);
+        const rawSubtotal = cart.reduce((s, i) => s + (i.qty * i.price), 0);
+
+        const discInfo = window.calculateDiscount(rawSubtotal, discountVal, discountType);
 
         countEl.innerText = `${totalQty} item`;
-        totalEl.innerText = 'Rp' + totalPrice.toLocaleString('id-ID');
+        if (subtotalEl) subtotalEl.innerText = 'Rp' + rawSubtotal.toLocaleString('id-ID');
+        if (discountDisplay) discountDisplay.innerText = '-Rp' + discInfo.discountAmount.toLocaleString('id-ID');
+        totalEl.innerText = 'Rp' + discInfo.finalTotal.toLocaleString('id-ID');
 
         if (!cart.length) {
             empty.style.display = 'block';
@@ -514,11 +604,16 @@
 
         console.log('📝 Customer Name:', customerName);
 
+        const discountTypeInput = document.getElementById('quickDiscountType');
+        const discountValueInput = document.getElementById('quickDiscountValue');
+
         const params = new URLSearchParams();
         params.append('cart', JSON.stringify(cart));
         params.append('payment', 0);
         params.append('payment_method', 'cash');
         params.append('customer_name', customerName);
+        params.append('discount_type', discountTypeInput ? discountTypeInput.value : 'rp');
+        params.append('discount_value', discountValueInput ? discountValueInput.value : 0);
 
         fetch('{{ route("kasir.order.store") }}', {
                 method: 'POST',
@@ -545,7 +640,10 @@
                 updateCartBadge();
                 if (typeof fetchProducts === 'function') {
                     const searchInput = document.getElementById('productSearch');
-                    fetchProducts(searchInput ? searchInput.value : '');
+                    fetchProducts(searchInput ? searchInput.value : '', true);
+                }
+                if (typeof renderPendingList === 'function') {
+                    renderPendingList();
                 }
                 showPage(redirectPage);
                 window.showAlert(data.message || 'Order berhasil dikirim.');
@@ -668,12 +766,14 @@
 
     window.openVariantModal = function(productName) {
         const rawVariants = products.filter(p => p.product_name === productName);
-        const seenV = new Set();
+        // Deduplication berdasarkan product_id agar produk dengan harga berbeda
+        // tapi variant/unit sama semua tetap tampil sebagai pilihan terpisah
+        const seenIds = new Set();
         currentVariants = [];
         rawVariants.forEach(p => {
-            const vKey = (p.variant || '-').trim().toLowerCase() + '||' + (p.unit || '-').trim().toLowerCase();
-            if (!seenV.has(vKey)) {
-                seenV.add(vKey);
+            const key = String(p.product_id);
+            if (!seenIds.has(key)) {
+                seenIds.add(key);
                 currentVariants.push(p);
             }
         });
@@ -703,6 +803,7 @@
     function renderVariantOptions() {
         const container = document.getElementById('variantOptionsContainer');
         if (!container) return;
+
 
         container.innerHTML = currentVariants.map(v => {
             const isSelected = v.product_id == selectedVariantId;
@@ -1112,7 +1213,7 @@
             
             // Refresh product list
             const currentSearch = document.getElementById('productSearch')?.value || '';
-            fetchProducts(currentSearch);
+            fetchProducts(currentSearch, true);
         })
         .catch(err => {
             console.error(err);
@@ -1157,7 +1258,7 @@
                         const searchInput = document.getElementById('productSearch');
                         if (searchInput) {
                             searchInput.value = decodedText;
-                            fetchProducts(decodedText);
+                            fetchProducts(decodedText, true);
                         }
                         window.showAlert(`Barang dengan kode "${decodedText}" tidak ditemukan.`, 'warning');
                     }
